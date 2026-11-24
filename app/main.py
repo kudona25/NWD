@@ -340,7 +340,7 @@ ROOT = STATIC.parent
 RUNTIME_PY = ROOT / "runtime" / "python" / "python.exe"
 # allow-list: only these go in the zip. data\ (map, credentials, secret.key), .venv and tests never do.
 PACKAGE_DIRS = ["app", "static", "runtime", "tools", "docs"]
-PACKAGE_FILES = ["start.bat", "README.md", "requirements.txt", "CONTEXT.md", ".gitignore"]
+PACKAGE_FILES = ["start.bat", "README.md", "README.en.md", "LICENSE", "requirements.txt", "CONTEXT.md", ".gitignore"]
 package_lock = threading.Lock()
 
 

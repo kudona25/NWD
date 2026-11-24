@@ -5,15 +5,16 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const fmtTime = (t) => (t ? new Date(t * 1000).toLocaleString("th-TH", { hour12: false }) : "-");
+// t() and srv() come from i18n.js (loaded first); `ts` here so it does not shadow t()
+const fmtTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString(LOCALE(), { hour12: false }) : "-");
 // set inside an exported .html file: show that frozen copy read-only, no server
 const SNAP = window.NWD_SNAPSHOT || null;
-const hhmm = (t) => (t ? new Date(t * 1000).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false }) : "-");
+const hhmm = (ts) => (ts ? new Date(ts * 1000).toLocaleTimeString(LOCALE(), { hour: "2-digit", minute: "2-digit", hour12: false }) : "-");
 
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail || r.statusText);
+  if (!r.ok) throw new Error(srv(data.detail) || r.statusText);
   return data;
 }
 
@@ -40,7 +41,7 @@ document.addEventListener("click", (e) => {
 });
 
 /* ============================================================ map */
-const STATUS_TH = { up: "ปกติ", unreachable: "เข้าไม่ได้", boundary: "นอกขอบเขต", suspect: "Suspect", down: "หายไป" };
+const statusName = (s) => (["up", "unreachable", "boundary", "suspect", "down"].includes(s) ? t("st." + s) : s);
 const MEDIA_TH = { UTP: "UTP", MM: "Fiber MM", SM: "Fiber SM", DAC: "DAC", Unknown: "Unknown" };
 const mediaColor = (m) => css({ UTP: "--utp", MM: "--mm", SM: "--sm", DAC: "--dac" }[m] || "--gray");
 
@@ -165,7 +166,7 @@ function edgeStyle(link) {
   if (down === n) color = css("--down");
   else if (down > 0) color = css("--partial");
   else if (sus > 0) dashes = [6, 6];
-  const label = n > 1 ? (up === n ? `×${n}` : `×${up}/${n}`) + (mixed ? " · ผสม" : "") : "";
+  const label = n > 1 ? (up === n ? `×${n}` : `×${up}/${n}`) + (mixed ? " · " + t("mixed") : "") : "";
   return {
     color: { color, highlight: css("--accent"), hover: css("--accent") },
     width: 2 + (n - 1) * 2, dashes,
@@ -335,7 +336,7 @@ function hidePanel() { selected = null; $("#panel").classList.add("hidden"); }
 $("#panelClose").onclick = () => { hidePanel(); network && network.unselectAll(); };
 
 function mediaTag(m) { return `<span class="media-tag" style="background:${mediaColor(m)}">${esc(MEDIA_TH[m] || m)}</span>`; }
-function pill(s) { return `<span class="pill ${s}">${esc(STATUS_TH[s] || s)}</span>`; }
+function pill(s) { return `<span class="pill ${s}">${esc(statusName(s))}</span>`; }
 
 function showPanel(type, id, refresh = false) {
   selected = { type, id };
@@ -354,22 +355,22 @@ function showPanel(type, id, refresh = false) {
       <h3>${d.kind === "ap" ? "📶 " : ""}${esc(d.name)}</h3>
       <div class="sub">${d.kind === "ap" ? "Access Point" : "Switch"}${d.hop === 0 ? " · Seed Switch" : ""}</div>
       <dl class="kv">
-        <dt>สถานะ</dt><dd>${pill(d.status)}${d.note ? `<br><small>${esc(d.note)}</small>` : ""}</dd>
+        <dt>${t("p.status")}</dt><dd>${pill(d.status)}${d.note ? `<br><small>${esc(srv(d.note))}</small>` : ""}</dd>
         <dt>IP</dt><dd>${esc(d.ip || "-")}</dd>
-        ${d.kind !== "ap" && d.proto ? `<dt>เข้าด้วย</dt><dd>${d.proto === "telnet" ? '<span class="tn">TELNET</span> ไม่เข้ารหัส — ควรเปิด SSH' : "SSH"}</dd>` : ""}
-        <dt>รุ่น</dt><dd>${esc(d.platform || "-")}</dd>
+        ${d.kind !== "ap" && d.proto ? `<dt>${t("p.via")}</dt><dd>${d.proto === "telnet" ? '<span class="tn">TELNET</span> ' + esc(t("p.telnetWarn")) : "SSH"}</dd>` : ""}
+        <dt>${t("p.model")}</dt><dd>${esc(d.platform || "-")}</dd>
         ${d.kind !== "ap" ? `<dt>Serial No.</dt><dd>${d.serial ? (d.serial.split(", ").length > 1
           ? d.serial.split(", ").map((s, i) => `<small>#${i + 1}</small> <span class="sn">${esc(s)}</span>`).join("<br>")
           : `<span class="sn">${esc(d.serial)}</span>`) : "-"}</dd>` : ""}
         <dt>Hop</dt><dd>${d.hop ?? "-"}</dd>
-        <dt>ต่อจาก</dt><dd>${d.parent ? `<span class="peer" data-dev="${esc(d.parent)}">${esc(d.parent)}</span>` : "-"}</dd>
-        <dt>เห็นล่าสุด</dt><dd>${fmtTime(d.last_seen)}</dd>
+        <dt>${t("p.parent")}</dt><dd>${d.parent ? `<span class="peer" data-dev="${esc(d.parent)}">${esc(d.parent)}</span>` : "-"}</dd>
+        <dt>${t("p.lastSeen")}</dt><dd>${fmtTime(d.last_seen)}</dd>
       </dl>
-      ${d.ip && !SNAP ? `<button class="btn primary" id="termDev" title="เปิดแท็บใหม่ใน Windows Terminal · พิมพ์รหัสผ่านเอง">
-        ⌨ เปิด ${d.proto === "telnet" ? "Telnet" : "SSH"}</button> ` : ""}
-      ${SNAP ? "" : d.status === "down" ? `<button class="btn danger" id="ackDev">รับทราบ · ลบออกจากแผนที่</button>`
-        : `<button class="btn danger" id="delDev" title="ถ้ายังต่ออยู่และอยู่ในขอบเขต crawl จะกลับมาในรอบถัดไป">ลบออกจากแผนที่</button>`}
-      <h4>สายที่ต่ออยู่ (${mine.length})</h4>
+      ${d.ip && !SNAP ? `<button class="btn primary" id="termDev" title="${esc(t("p.term.title"))}">
+        ⌨ ${esc(t("p.open", { p: d.proto === "telnet" ? "Telnet" : "SSH" }))}</button> ` : ""}
+      ${SNAP ? "" : d.status === "down" ? `<button class="btn danger" id="ackDev">${esc(t("p.ack"))}</button>`
+        : `<button class="btn danger" id="delDev" title="${esc(t("p.del.title"))}">${esc(t("p.del"))}</button>`}
+      <h4>${esc(t("p.cables", { n: mine.length }))}</h4>
       <table class="cables">${mine.map((m) => `
         <tr><td><b>${esc(m.local)}</b></td><td>→</td>
         <td><span class="peer" data-dev="${esc(m.peer)}">${esc(m.pn)}</span> ${esc(m.peerPort)}</td>
@@ -383,15 +384,15 @@ function showPanel(type, id, refresh = false) {
     if (term) term.onclick = async () => {
       try {
         const r = await api("POST", "/api/devices/terminal", { key: id });
-        toast(`เปิด ${r.proto.toUpperCase()} ไป ${d.ip}${r.username ? " ด้วย " + r.username : ""} แล้ว — ดูที่ Windows Terminal`);
+        toast(t("toast.term", { p: r.proto.toUpperCase(), ip: d.ip, user: r.username ? t("toast.term.as", { u: r.username }) : "" }));
       } catch (e) { toast(e.message, true); }
     };
     const del = $("#delDev");
     if (del) del.onclick = async () => {
       // several selected (Ctrl+click) → delete them all
       const keys = network.getSelectedNodes().includes(id) ? network.getSelectedNodes() : [id];
-      if (!confirmInline("#delDev", keys.length > 1 ? `ยืนยัน: ลบ ${keys.length} อุปกรณ์?` : "ยืนยัน: กดอีกครั้งเพื่อลบ")) return;
-      try { const r = await api("DELETE", "/api/devices", { keys }); hidePanel(); toast(`ลบแล้ว ${r.deleted} อุปกรณ์`); }
+      if (!confirmInline("#delDev", keys.length > 1 ? t("confirm.delMany", { n: keys.length }) : t("confirm.del"))) return;
+      try { const r = await api("DELETE", "/api/devices", { keys }); hidePanel(); toast(t("toast.deleted", { n: r.deleted })); }
       catch (e) { toast(e.message, true); }
     };
   } else {
@@ -401,23 +402,23 @@ function showPanel(type, id, refresh = false) {
     l.cables.sort((x, y) => x.a_port.localeCompare(y.a_port, undefined, { numeric: true }));
     body.innerHTML = `
       <h3>${esc(name(l.a))} ↔ ${esc(name(l.b))}</h3>
-      <div class="sub">${l.cables.length} สาย</div>
+      <div class="sub">${esc(t("l.count", { n: l.cables.length }))}</div>
       <table class="cables">
-        <tr><td><small>${esc(name(l.a))}</small></td><td></td><td><small>${esc(name(l.b))}</small></td><td><small>ประเภทสาย</small></td><td></td></tr>
+        <tr><td><small>${esc(name(l.a))}</small></td><td></td><td><small>${esc(name(l.b))}</small></td><td><small>${esc(t("l.media"))}</small></td><td></td></tr>
         ${l.cables.map((c) => `
         <tr>
           <td><b>${esc(c.a_port)}</b></td><td>↔</td><td><b>${esc(c.b_port)}</b></td>
-          <td>${SNAP ? mediaTag(cableMedia(c)) + (c.media_override ? " <small>(แก้เอง)</small>" : "") : `<select data-cable="${esc(c.id)}" title="${c.media_override ? "แก้เอง (ระบบตรวจได้: " + esc(c.media) + ")" : "ตรวจจาก transceiver"}">
-            <option value="">อัตโนมัติ (${esc(MEDIA_TH[c.media] || c.media)})</option>
+          <td>${SNAP ? mediaTag(cableMedia(c)) + (c.media_override ? ` <small>(${esc(t("l.manual"))})</small>` : "") : `<select data-cable="${esc(c.id)}" title="${esc(c.media_override ? t("l.manualTitle", { m: c.media }) : t("l.detected"))}">
+            <option value="">${esc(t("l.auto", { m: MEDIA_TH[c.media] || c.media }))}</option>
             ${Object.keys(MEDIA_TH).map((m) => `<option value="${m}" ${c.media_override === m ? "selected" : ""}>${MEDIA_TH[m]}</option>`).join("")}
           </select>`}</td>
           <td>${c.status !== "up" ? pill(c.status) : ""}
-              ${c.status === "down" && !SNAP ? `<button class="btn danger" data-ack="${esc(c.id)}" style="padding:1px 6px;font-size:11px">รับทราบ</button>` : ""}</td>
+              ${c.status === "down" && !SNAP ? `<button class="btn danger" data-ack="${esc(c.id)}" style="padding:1px 6px;font-size:11px">${esc(t("l.ack"))}</button>` : ""}</td>
         </tr>`).join("")}
       </table>
-      <p class="hint">ประเภทสายตรวจจากชนิด SFP/พอร์ตที่ switch รายงาน — เลือกเองได้ถ้าไม่ตรง</p>`;
+      <p class="hint">${esc(t("l.hint"))}</p>`;
     $$("select[data-cable]", body).forEach((s) => (s.onchange = async () => {
-      try { await api("POST", "/api/cables/media", { id: s.dataset.cable, media: s.value || null }); toast("บันทึกประเภทสายแล้ว"); }
+      try { await api("POST", "/api/cables/media", { id: s.dataset.cable, media: s.value || null }); toast(t("toast.mediaSaved")); }
       catch (e) { toast(e.message, true); }
     }));
     $$("[data-ack]", body).forEach((b) => (b.onclick = async () => {
@@ -440,26 +441,26 @@ $("#search").addEventListener("keydown", (e) => {
   const q = e.target.value.trim().toLowerCase();
   if (!q) return;
   const d = topo.devices.find((x) => x.name.toLowerCase().includes(q) || (x.ip || "").includes(q));
-  d ? focusDevice(d.key) : toast("ไม่พบอุปกรณ์", true);
+  d ? focusDevice(d.key) : toast(t("toast.notFound"), true);
 });
 $("#btnFit").onclick = () => network && network.fit({ animation: { duration: 400 } });
 $("#btnLayout").onclick = async () => {
-  if (!confirmInline("#btnLayout", "ยืนยัน: ล้างตำแหน่งที่ลากไว้?")) return;
+  if (!confirmInline("#btnLayout", t("confirm.layout"))) return;
   try { await api("DELETE", "/api/positions"); firstFit = true; } catch (e) { toast(e.message, true); }
 };
 $("#btnClearMap").onclick = async () => {
-  if (!confirmInline("#btnClearMap", "ยืนยัน: กดอีกครั้งเพื่อล้างแผนที่ทั้งหมด")) return;
+  if (!confirmInline("#btnClearMap", t("confirm.clear"))) return;
   try {
     const r = await api("DELETE", "/api/topology" + ($("#clearEvents").checked ? "?events=true" : ""));
     hidePanel(); firstFit = true; unseen = 0; renderBadge();
     await loadEvents();
-    toast(`ล้างแผนที่แล้ว (${r.deleted} อุปกรณ์)`);
+    toast(t("toast.cleared", { n: r.deleted }));
   } catch (e) { toast(e.message, true); }
 };
 
 /* ---------- Export PDF: whole map as an image + device / cable tables, printed from a hidden frame */
 async function exportPdf() {
-  if (!network || !topo.devices.length) return toast("ยังไม่มีข้อมูลแผนที่", true);
+  if (!network || !topo.devices.length) return toast(t("toast.noMap"), true);
   const btn = $("#btnPdf");
   btn.disabled = true;
   const view = { position: network.getViewPosition(), scale: network.getScale() };
@@ -492,9 +493,9 @@ async function exportPdf() {
   const devs = topo.devices.slice().sort((a, b) => (a.kind === "ap") - (b.kind === "ap") || (a.hop ?? 99) - (b.hop ?? 99) || num(a.name, b.name));
   const cabs = topo.cables.slice().sort((a, b) => num(name(a.a), name(b.a)) || num(a.a_port, b.a_port));
   const sw = devs.filter((d) => d.kind !== "ap").length;
-  const now = new Date().toLocaleString("th-TH", { hour12: false });
+  const now = new Date().toLocaleString(LOCALE(), { hour12: false });
 
-  const html = `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>NWD Topology ${esc(topo.seed)} ${esc(now)}</title>
+  const html = `<!DOCTYPE html><html lang="${LANG}"><head><meta charset="utf-8"><title>NWD Topology ${esc(topo.seed)} ${esc(now)}</title>
 <style>
   @page { size: A4 landscape; margin: 10mm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -509,18 +510,18 @@ async function exportPdf() {
   .s-down { color: #c62828; font-weight: 600; } .s-suspect { color: #b26a00; } .s-unreachable, .s-boundary { color: #666; }
 </style></head><body>
 <h1>NWD · Logical Topology</h1>
-<div class="meta">Seed Switch: ${esc(topo.seed || "-")} · ${sw} switch · ${devs.length - sw} AP · ${cabs.length} สาย · พิมพ์เมื่อ ${esc(now)}</div>
+<div class="meta">Seed Switch: ${esc(topo.seed || "-")} · ${esc(t("pdf.meta", { sw, ap: devs.length - sw, c: cabs.length, now }))}</div>
 <img class="map" src="${img}">
-<h2 class="break">อุปกรณ์ (${devs.length})</h2>
-<table><thead><tr><th>ชื่อ</th><th>ประเภท</th><th>IP</th><th>รุ่น</th><th>Serial No.</th><th>สถานะ</th><th>เข้าด้วย</th><th>Hop</th><th>ต่อจาก</th><th>เห็นล่าสุด</th></tr></thead><tbody>
+<h2 class="break">${esc(t("pdf.devices", { n: devs.length }))}</h2>
+<table><thead><tr><th>${t("pdf.name")}</th><th>${t("pdf.type")}</th><th>IP</th><th>${t("p.model")}</th><th>Serial No.</th><th>${t("p.status")}</th><th>${t("p.via")}</th><th>Hop</th><th>${t("p.parent")}</th><th>${t("p.lastSeen")}</th></tr></thead><tbody>
 ${devs.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.hop === 0 ? " (Seed)" : ""}</td><td>${d.kind === "ap" ? "AP" : "Switch"}</td>
-<td>${esc(d.ip || "-")}</td><td>${esc(d.platform || "-")}</td><td>${(d.serial || "-").split(", ").map(esc).join("<br>")}</td><td class="s-${d.status}">${esc(STATUS_TH[d.status] || d.status)}${d.note ? `<br><small>${esc(d.note)}</small>` : ""}</td>
+<td>${esc(d.ip || "-")}</td><td>${esc(d.platform || "-")}</td><td>${(d.serial || "-").split(", ").map(esc).join("<br>")}</td><td class="s-${d.status}">${esc(statusName(d.status))}${d.note ? `<br><small>${esc(srv(d.note))}</small>` : ""}</td>
 <td>${d.kind === "ap" ? "" : esc((d.proto || "").toUpperCase())}</td><td>${d.hop ?? "-"}</td><td>${esc(d.parent ? name(d.parent) : "-")}</td><td>${fmtTime(d.last_seen)}</td></tr>`).join("")}
 </tbody></table>
-<h2>สาย (${cabs.length})</h2>
-<table><thead><tr><th>อุปกรณ์ A</th><th>พอร์ต A</th><th>อุปกรณ์ B</th><th>พอร์ต B</th><th>ประเภทสาย</th><th>สถานะ</th></tr></thead><tbody>
+<h2>${esc(t("pdf.cables", { n: cabs.length }))}</h2>
+<table><thead><tr><th>${t("pdf.devA")}</th><th>${t("pdf.portA")}</th><th>${t("pdf.devB")}</th><th>${t("pdf.portB")}</th><th>${t("l.media")}</th><th>${t("p.status")}</th></tr></thead><tbody>
 ${cabs.map((c) => `<tr><td>${esc(name(c.a))}</td><td>${esc(c.a_port)}</td><td>${esc(name(c.b))}</td><td>${esc(c.b_port)}</td>
-<td>${esc(MEDIA_TH[cableMedia(c)] || cableMedia(c))}${c.media_override ? " (แก้เอง)" : ""}</td><td class="s-${c.status}">${esc(STATUS_TH[c.status] || c.status)}</td></tr>`).join("")}
+<td>${esc(MEDIA_TH[cableMedia(c)] || cableMedia(c))}${c.media_override ? ` (${esc(t("l.manual"))})` : ""}</td><td class="s-${c.status}">${esc(statusName(c.status))}</td></tr>`).join("")}
 </tbody></table></body></html>`;
 
   $("#printFrame")?.remove();
@@ -533,14 +534,14 @@ ${cabs.map((c) => `<tr><td>${esc(name(c.a))}</td><td>${esc(c.a_port)}</td><td>${
   const im = f.contentDocument.querySelector("img");
   im.complete ? go() : (im.onload = go);
 }
-$("#btnPdf").onclick = () => exportPdf().catch((e) => toast("Export ไม่สำเร็จ: " + e.message, true));
+$("#btnPdf").onclick = () => exportPdf().catch((e) => toast(t("toast.exportFail") + e.message, true));
 
 /* ---------- Export HTML: this same page + its scripts + a frozen copy of the data, in one file */
 async function exportHtml() {
-  if (!network || !topo.devices.length) return toast("ยังไม่มีข้อมูลแผนที่", true);
+  if (!network || !topo.devices.length) return toast(t("toast.noMap"), true);
   const get = (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u + " " + r.status); return r.text(); });
-  const [page, style, vis, js, evs] = await Promise.all([
-    get("/"), get("/static/style.css"), get("/static/vendor/vis-network.min.js"), get("/static/app.js"),
+  const [page, style, vis, i18n, js, evs] = await Promise.all([
+    get("/"), get("/static/style.css"), get("/static/vendor/vis-network.min.js"), get("/static/i18n.js"), get("/static/app.js"),
     api("GET", "/api/events?limit=2000"),
   ]);
   // positions as they are on screen now, including auto-laid-out ones
@@ -553,11 +554,12 @@ async function exportHtml() {
   const inline = (s) => s.replace(/<\/script/gi, "<\\/script");
   const data = JSON.stringify(snap).replace(/</g, "\\u003c");
   const swap = (html, from, to) => {
-    if (!html.includes(from)) throw new Error("ไม่พบ " + from);
+    if (!html.includes(from)) throw new Error(t("toast.missing") + from);
     return html.replace(from, () => to); // function form: no $& surprises inside the minified code
   };
   let out = swap(page, '<link rel="stylesheet" href="/static/style.css">', `<style>\n${style}\n</style>`);
   out = swap(out, '<script src="/static/vendor/vis-network.min.js"></script>', `<script>${inline(vis)}</script>`);
+  out = swap(out, '<script src="/static/i18n.js"></script>', `<script>${inline(i18n)}</script>`);
   out = swap(out, '<script src="/static/app.js"></script>', `<script>window.NWD_SNAPSHOT=${data};</script>\n<script>${inline(js)}</script>`);
   out = out.replace("<title>NWD · Logical Topology</title>", () => `<title>NWD ${esc(topo.seed)} · ${esc(fmtTime(snap.exported))}</title>`);
 
@@ -567,9 +569,9 @@ async function exportHtml() {
   const url = URL.createObjectURL(new Blob([out], { type: "text/html" }));
   Object.assign(document.createElement("a"), { href: url, download: name }).click();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
-  toast(`บันทึก ${name} แล้ว — เปิดด้วย browser เครื่องไหนก็ได้`);
+  toast(t("toast.htmlSaved", { f: name }));
 }
-$("#btnHtml").onclick = () => exportHtml().catch((e) => toast("Export ไม่สำเร็จ: " + e.message, true));
+$("#btnHtml").onclick = () => exportHtml().catch((e) => toast(t("toast.exportFail") + e.message, true));
 
 // two-click confirm without browser dialogs
 function confirmInline(sel, msg) {
@@ -586,21 +588,21 @@ function renderStatus() {
   const s = status;
   const txt = $("#statusText");
   const dot = $("#wsDot");
-  if (SNAP) { txt.textContent = `Snapshot ${fmtTime(SNAP.exported)} · ดูอย่างเดียว`; dot.className = "dot"; return; }
-  if (!wsOpen) { txt.textContent = "ขาดการเชื่อมต่อกับ server…"; dot.className = "dot off"; return; }
+  if (SNAP) { txt.textContent = t("status.snapshot", { t: fmtTime(SNAP.exported) }); dot.className = "dot"; return; }
+  if (!wsOpen) { txt.textContent = t("status.disconnected"); dot.className = "dot off"; return; }
   if (s.running) {
-    txt.textContent = `กำลัง crawl ${s.progress[0]}/${s.progress[1]} switch`;
+    txt.textContent = t("status.crawling", { a: s.progress[0], b: s.progress[1] });
     dot.className = "dot busy";
   } else if (s.paused) {
-    txt.textContent = "ยังไม่ scan — กด Rescan เพื่อเริ่ม";
+    txt.textContent = t("status.paused");
     dot.className = "dot busy";
   } else {
-    txt.textContent = `ล่าสุด ${hhmm(s.last_run)} · รอบถัดไป ${hhmm(s.next_run)}`;
+    txt.textContent = t("status.idle", { a: hhmm(s.last_run), b: hhmm(s.next_run) });
     dot.className = "dot";
   }
   $("#btnRescan").disabled = !!s.running;
   const bar = $("#errorBar");
-  bar.textContent = s.error || "";
+  bar.textContent = srv(s.error) || "";
   bar.classList.toggle("hidden", !s.error);
   renderStartDialog();
 }
@@ -613,11 +615,11 @@ function renderStartDialog() {
   if (!show) return;
   $("#startSeed").textContent = topo.seed;
   const sw = topo.devices.filter((d) => d.kind !== "ap").length;
-  $("#startCount").textContent = topo.devices.length ? `· บนแผนที่ ${sw} switch, ${topo.devices.length - sw} AP` : "· แผนที่ว่าง";
+  $("#startCount").textContent = topo.devices.length ? t("start.count", { sw, ap: topo.devices.length - sw }) : t("start.empty");
 }
 const closeStart = () => { sessionStorage.setItem(startKey(), "1"); renderStartDialog(); };
 $("#startScan").onclick = async () => {
-  try { const r = await api("POST", "/api/rescan"); r.ok ? toast("เริ่ม scan แล้ว") : toast(r.msg, true); closeStart(); }
+  try { const r = await api("POST", "/api/rescan"); r.ok ? toast(t("toast.scanStarted")) : toast(srv(r.msg), true); closeStart(); }
   catch (e) { toast(e.message, true); }
 };
 $("#startMove").onclick = async () => {
@@ -626,49 +628,57 @@ $("#startMove").onclick = async () => {
     closeStart(); hidePanel(); firstFit = true; await loadEvents();
     showTab("settings"); history.replaceState(null, "", "#settings");
     setTimeout(() => { const f = $("#fSettings").seed_ip; f.focus(); f.select(); }, 300);
-    toast("ล้างแผนที่แล้ว — ใส่ Seed IP / credential ของ site ใหม่ → บันทึก → กด Rescan");
+    toast(t("toast.moved"));
   } catch (e) { toast(e.message, true); }
 };
 $("#startView").onclick = closeStart;
 $("#btnRescan").onclick = async () => {
-  try { const r = await api("POST", "/api/rescan"); toast(r.ok ? "เริ่ม crawl แล้ว" : r.msg, !r.ok); } catch (e) { toast(e.message, true); }
+  try { const r = await api("POST", "/api/rescan"); toast(r.ok ? t("toast.crawlStarted") : srv(r.msg), !r.ok); } catch (e) { toast(e.message, true); }
 };
 
 /* ============================================================ events */
+// kind → severity class; the label comes from i18n ("ev.k.<kind>")
 const EV = {
-  initial: ["Crawl แรก", "info"], device_new: ["อุปกรณ์ใหม่", "info"], device_down: ["อุปกรณ์หายไป", "bad"],
-  device_back: ["อุปกรณ์กลับมา", "good"], cable_new: ["สายใหม่", "info"], cable_down: ["สายหลุด", "bad"],
-  cable_back: ["สายกลับมา", "good"], cable_moved: ["ย้ายพอร์ต", "warn"], login_fail: ["ล็อกอินไม่ได้", "warn"],
-  login_ok: ["ล็อกอินได้แล้ว", "good"], seed_fail: ["Seed เข้าไม่ได้", "bad"], gap: ["ระบบไม่ได้ทำงาน", "warn"],
-  ack: ["รับทราบ", "info"], telnet: ["เข้าด้วย Telnet", "warn"],
-  removed: ["ลบโดยผู้ใช้", "info"], cleared: ["ล้างแผนที่", "warn"], serial_changed: ["Serial เปลี่ยน", "warn"],
+  initial: "info", device_new: "info", device_down: "bad", device_back: "good", cable_new: "info", cable_down: "bad",
+  cable_back: "good", cable_moved: "warn", login_fail: "warn", login_ok: "good", seed_fail: "bad", gap: "warn",
+  ack: "info", telnet: "warn", removed: "info", cleared: "warn", serial_changed: "warn",
 };
+const evLabel = (k) => (k in EV ? t("ev.k." + k) : k);
 let events = [];
 let unseen = 0;
 function evRow(e, isNew) {
-  const [label, cls] = EV[e.kind] || [e.kind, "info"];
-  return `<tr class="${isNew ? "ev-new" : ""}"><td>${fmtTime(e.ts)}</td><td><span class="ev-kind ev-${cls}">${esc(label)}</span></td>
-    <td>${esc(e.subject)}</td><td>${esc(e.detail)}</td></tr>`;
+  const cls = EV[e.kind] || "info";
+  return `<tr class="${isNew ? "ev-new" : ""}"><td>${fmtTime(e.ts)}</td><td><span class="ev-kind ev-${cls}">${esc(evLabel(e.kind))}</span></td>
+    <td>${esc(srv(e.subject))}</td><td>${esc(srv(e.detail))}</td></tr>`;
 }
 function renderEvents(newCount = 0) {
   const f = $("#evFilter").value.trim().toLowerCase();
-  const list = f ? events.filter((e) => JSON.stringify(e).toLowerCase().includes(f) || (EV[e.kind]?.[0] || "").includes(f)) : events;
+  const shown = (e) => [JSON.stringify(e), evLabel(e.kind), srv(e.subject), srv(e.detail)].join(" ").toLowerCase();
+  const list = f ? events.filter((e) => shown(e).includes(f)) : events;
   $("#evRows").innerHTML = list.slice(0, 500).map((e, i) => evRow(e, i < newCount)).join("") ||
-    `<tr><td colspan="4" class="hint">ยังไม่มีเหตุการณ์</td></tr>`;
+    `<tr><td colspan="4" class="hint">${esc(t("ev.none"))}</td></tr>`;
 }
 function renderBadge() { const b = $("#evBadge"); b.textContent = unseen; b.classList.toggle("hidden", !unseen); }
 $("#evFilter").oninput = () => renderEvents();
 async function loadEvents() { events = await api("GET", "/api/events"); renderEvents(); }
 
 /* ============================================================ settings */
+let lastSettings = null;
+let lastOverrides = [];
+function renderSecretPlaceholders() {
+  if (!lastSettings) return;
+  const f = $("#fSettings");
+  f.password.placeholder = lastSettings.has_password ? t("set.pwSaved") : t("set.pwNone");
+  f.enable.placeholder = lastSettings.has_enable ? t("set.pwSaved") : t("set.enNone");
+}
 async function loadSettings() {
   const s = await api("GET", "/api/settings");
+  lastSettings = s;
   const f = $("#fSettings");
   f.seed_ip.value = s.seed_ip; f.interval_min.value = s.interval_min; f.max_hops.value = s.max_hops;
   f.workers.value = s.workers; f.timeout_sec.value = s.timeout_sec; f.allowed_subnets.value = s.allowed_subnets.join("\n"); f.username.value = s.username;
   f.password.value = ""; f.enable.value = ""; f.clear_enable.checked = false; f.telnet_fallback.checked = s.telnet_fallback;
-  f.password.placeholder = s.has_password ? "•••••• (บันทึกไว้แล้ว)" : "ยังไม่ได้ตั้ง";
-  f.enable.placeholder = s.has_enable ? "•••••• (บันทึกไว้แล้ว)" : "ไม่มี (ไม่บังคับ)";
+  renderSecretPlaceholders();
   renderOverrides(await api("GET", "/api/overrides"));
 }
 $("#fSettings").onsubmit = async (e) => {
@@ -681,15 +691,14 @@ $("#fSettings").onsubmit = async (e) => {
       username: f.username.value, password: f.password.value, enable: f.enable.value, clear_enable: f.clear_enable.checked,
       telnet_fallback: f.telnet_fallback.checked,
     });
-    toast("บันทึกแล้ว — กด Rescan เพื่อ crawl ทันที");
+    toast(t("toast.saved"));
     loadSettings();
   } catch (err) { toast(err.message, true); }
 };
 $("#btnPackage").onclick = async () => {
   const b = $("#btnPackage");
-  const label = b.textContent;
   b.disabled = true;
-  b.textContent = "กำลังสร้าง… (ครั้งแรกอาจนาน 1–2 นาที)";
+  b.textContent = t("pkg.building");
   try {
     const r = await fetch("/api/package");
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -697,18 +706,19 @@ $("#btnPackage").onclick = async () => {
     const url = URL.createObjectURL(await r.blob());
     Object.assign(document.createElement("a"), { href: url, download: name }).click();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-    if (r.headers.get("X-NWD-Runtime") === "1") toast(`ดาวน์โหลด ${name} แล้ว — แตก zip แล้วกด start.bat ได้เลย`);
-    else toast(`${decodeURIComponent(r.headers.get("X-NWD-Warning") || "")} — zip นี้ไม่มี Python เครื่องปลายทางต้องติดตั้ง Python และต่อเน็ตเอง`, true);
-  } catch (e) { toast("ดาวน์โหลดไม่สำเร็จ: " + e.message, true); }
-  finally { b.disabled = false; b.textContent = label; }
+    if (r.headers.get("X-NWD-Runtime") === "1") toast(t("toast.pkgOk", { f: name }));
+    else toast(t("toast.pkgNoPy", { w: srv(decodeURIComponent(r.headers.get("X-NWD-Warning") || "")) }), true);
+  } catch (e) { toast(t("toast.dlFail") + e.message, true); }
+  finally { b.disabled = false; b.textContent = t("pkg.btn"); }
 };
 
 function renderOverrides(list) {
+  lastOverrides = list;
   $("#ovRows").innerHTML = list.map((o) => `<tr><td>${esc(o.ip)}</td>
     <td>${o.protocol === "telnet" ? '<span class="tn">TELNET</span>' : "SSH"}</td><td>${esc(o.username)}</td>
     <td>${o.has_password ? "••••••" : "-"}</td><td>${o.has_enable ? "••••••" : "-"}</td>
-    <td><button class="btn danger" data-delov="${esc(o.ip)}" style="padding:2px 8px">ลบ</button></td></tr>`).join("") ||
-    `<tr><td colspan="6" class="hint">ยังไม่มี — ทุก switch ใช้ Default Credential</td></tr>`;
+    <td><button class="btn danger" data-delov="${esc(o.ip)}" style="padding:2px 8px">${esc(t("ov.del"))}</button></td></tr>`).join("") ||
+    `<tr><td colspan="6" class="hint">${esc(t("ov.none"))}</td></tr>`;
   $$("[data-delov]").forEach((b) => (b.onclick = async () => {
     try { renderOverrides(await api("DELETE", "/api/overrides", { ip: b.dataset.delov })); } catch (e) { toast(e.message, true); }
   }));
@@ -718,7 +728,7 @@ $("#fOverride").onsubmit = async (e) => {
   const f = e.target;
   try {
     renderOverrides(await api("PUT", "/api/overrides", { ip: f.ip.value, protocol: f.protocol.value, username: f.username.value, password: f.password.value, enable: f.enable.value }));
-    f.reset(); toast("บันทึก override แล้ว");
+    f.reset(); toast(t("toast.ovSaved"));
   } catch (err) { toast(err.message, true); }
 };
 
@@ -737,11 +747,29 @@ function connect() {
       events = [...msg.data.slice().reverse(), ...events];
       renderEvents(msg.data.length);
       if (!$("#tab-events").classList.contains("active")) { unseen += msg.data.length; renderBadge(); }
-      const bad = msg.data.filter((e) => (EV[e.kind] || [])[1] === "bad");
-      if (bad.length) toast(`⚠ ${EV[bad[0].kind][0]}: ${bad[0].subject}${bad.length > 1 ? ` และอีก ${bad.length - 1}` : ""}`, true);
+      const bad = msg.data.filter((e) => EV[e.kind] === "bad");
+      if (bad.length) toast(`⚠ ${evLabel(bad[0].kind)}: ${srv(bad[0].subject)}${bad.length > 1 ? t("toast.more", { n: bad.length - 1 }) : ""}`, true);
     }
   };
 }
+
+/* ============================================================ language */
+$("#btnLang").onclick = () => setLang(LANG === "th" ? "en" : "th");
+document.addEventListener("nwd-lang", () => {
+  $$("[data-armed]").forEach((b) => delete b.dataset.armed); // a half-confirmed button would restore old-language text
+  renderStatus();
+  renderEvents();
+  renderSecretPlaceholders();
+  renderOverrides(lastOverrides);
+  if (network) {
+    // only labels change ("mixed"); edgeStyle resets bends, so route again
+    edges.update(buildLinks(topo.cables).filter((l) => edges.get(l.id)).map((l) => ({ id: l.id, ...edgeStyle(l) })));
+    needRoute = true;
+    network.redraw();
+  }
+  if (selected) showPanel(selected.type, selected.id, true);
+});
+applyI18n();
 if (SNAP) {
   document.body.classList.add("snapshot");
   render(SNAP.topology);

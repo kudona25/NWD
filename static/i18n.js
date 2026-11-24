@@ -1,0 +1,239 @@
+/* NWD UI languages (Thai / English).
+   Static HTML: data-i18n (text), data-i18n-html (markup), data-i18n-title, data-i18n-ph (placeholder).
+   Code: t("key", {var}) with {var} placeholders.
+   Server messages (events, notes, errors) are stored in Thai; srv() translates them for display. */
+"use strict";
+
+const I18N = {
+  th: {
+    "lang.switch": "EN", "lang.title": "Switch to English",
+    "tab.map": "แผนที่", "tab.events": "เหตุการณ์", "tab.settings": "ตั้งค่า",
+    "ws.title": "การเชื่อมต่อ real-time", "status.connecting": "กำลังเชื่อมต่อ…",
+    "btn.layout": "จัดใหม่อัตโนมัติ", "btn.layout.title": "ล้างตำแหน่งที่ลากไว้ แล้วจัดใหม่ทั้งหมด",
+    "btn.fit": "พอดีจอ",
+    "btn.pdf.title": "แผนที่ + รายการอุปกรณ์และสาย · เลือก \"Save as PDF\" ในหน้าต่างพิมพ์",
+    "btn.html.title": "ไฟล์ .html ไฟล์เดียว เปิดได้ทุกเครื่องไม่ต้องรันโปรแกรม · คลิกดูรายละเอียด / ค้นหา / ดูเหตุการณ์ได้",
+    "search.ph": "ค้นหา hostname / IP",
+    "lg.devices": "อุปกรณ์", "lg.up": "ปกติ", "lg.suspect": "Suspect (ยังไม่แน่ใจ)", "lg.down": "หายไป (รอรับทราบ)",
+    "lg.gray": "เข้าไม่ได้ / นอกขอบเขต", "lg.telnet": "เข้าด้วย Telnet (ไม่เข้ารหัส)", "lg.cables": "สาย",
+    "lg.mixed": "หลายประเภทใน Link เดียว", "lg.partial": "บางเส้นหลุด", "lg.alldown": "หลุดทั้งหมด",
+    "empty.title": "ยังไม่มีข้อมูล topology",
+    "empty.body": 'ไปที่ <a href="#" data-goto="settings">ตั้งค่า</a> ใส่ IP ของ Seed Switch และ username/password แล้วกด Rescan',
+    "ev.filter.ph": "กรอง…", "ev.col.time": "เวลา", "ev.col.kind": "ประเภท", "ev.col.subject": "อุปกรณ์ / สาย", "ev.col.detail": "รายละเอียด",
+    "ev.none": "ยังไม่มีเหตุการณ์",
+    "set.interval": "รอบ crawl (นาที)", "set.hops": "Hop สูงสุด", "set.workers": "SSH พร้อมกัน",
+    "set.timeout": "Timeout ต่อ switch (วินาที)",
+    "set.timeout.title": "เวลาสูงสุดต่อ switch ตั้งแต่เชื่อมต่อจนอ่านคำสั่งครบ เกินแล้วถือว่าเข้าไม่ได้",
+    "set.subnets.hint": "บรรทัดละ 1 ช่วง · ว่าง = ไม่จำกัด", "set.cred.hint": "ใช้กับทุก switch ที่ไม่มี override",
+    "set.clear_enable": "ลบ enable secret ที่บันทึกไว้", "set.telnet": "ลอง Telnet เมื่อ SSH ถูกปฏิเสธ",
+    "set.telnet.hint": "เฉพาะกรณี port 22 ตอบ refused · ไม่ลองเมื่อ timeout หรือรหัสผิด · Telnet ส่งรหัสผ่านแบบไม่เข้ารหัส",
+    "btn.save": "บันทึก",
+    "set.pwSaved": "•••••• (บันทึกไว้แล้ว)", "set.pwNone": "ยังไม่ได้ตั้ง", "set.enNone": "ไม่มี (ไม่บังคับ)",
+    "ov.title": "Credential เฉพาะ switch", "ov.sub": "override ค่า default ตาม IP", "ov.enable.ph": "enable (ถ้ามี)",
+    "ov.submit": "เพิ่ม / แก้ไข",
+    "ov.hint": "แก้ไขรายการเดิม: ใส่ IP เดิม · ช่อง password ว่าง = ใช้ค่าเดิม · switch ที่มี override จะใช้ protocol ที่กำหนดเท่านั้น (ไม่ fallback)",
+    "ov.del": "ลบ", "ov.none": "ยังไม่มี — ทุก switch ใช้ Default Credential",
+    "clr.title": "ล้างแผนที่ / ย้าย Site", "clr.sub": "ลบอุปกรณ์และสายที่ scan ไว้ทั้งหมด",
+    "clr.hint": "ก่อนไปทำ site ใหม่: Export PDF เก็บไว้ก่อน → เปลี่ยน Seed Switch IP / credential ด้านบนแล้วบันทึก → กดล้างแผนที่ → Rescan<br>ถ้ายังไม่เปลี่ยน Seed IP รอบ crawl ถัดไปจะ scan site เดิมกลับมาใหม่ · ค่าตั้งค่าและ credential ไม่ถูกลบ",
+    "clr.events": "ลบประวัติเหตุการณ์ด้วย", "clr.btn": "ล้างแผนที่ทั้งหมด",
+    "pkg.title": "ดาวน์โหลดชุดโปรแกรม", "pkg.sub": "เอาไปเปิดเครื่องอื่น / แจกเพื่อนร่วมทีม",
+    "pkg.hint": "ได้ไฟล์ zip ที่มีโปรแกรม + Python พกพาในตัว · แตก zip แล้วดับเบิลคลิก <code>start.bat</code> ใช้ได้เลย ไม่ต้องติดตั้งอะไร (Windows 10/11 64-bit)<br><b>ไม่มี</b>แผนที่, ประวัติเหตุการณ์ และ username/password ของ switch ติดไป — ผู้รับเริ่มตั้งค่าใหม่เอง",
+    "pkg.btn": "⬇ ดาวน์โหลด zip", "pkg.building": "กำลังสร้าง… (ครั้งแรกอาจนาน 1–2 นาที)",
+    "key.hint": "รหัสผ่านถูกเข้ารหัสใน <code>data\\nwd.db</code> ด้วยกุญแจ <code>data\\secret.key</code> — สำรองสองไฟล์นี้ไว้คู่กันเสมอ",
+    "start.title": "เริ่มใช้งาน — ยังไม่ได้ scan", "start.last": "Site ที่ตั้งไว้ล่าสุด:",
+    "start.scan": "⟳ Scan site เดิม", "start.move": "ย้าย site ใหม่ · ล้างแผนที่เดิม", "start.view": "ดูแผนที่เดิมก่อน (ยังไม่ scan)",
+    "start.clear": "ล้างประวัติเหตุการณ์ของ site เดิมด้วย (เมื่อย้าย site)",
+    "start.hint": "ย้าย site ใหม่: ล้างแผนที่ แล้วพาไปหน้าตั้งค่า ใส่ Seed IP / credential ของ site ใหม่ → บันทึก → กด Rescan<br>อยากเก็บแผนที่เดิมไว้? เลือก \"ดูแผนที่เดิมก่อน\" แล้วกด Export PDF ก่อน",
+    "start.count": "· บนแผนที่ {sw} switch, {ap} AP", "start.empty": "· แผนที่ว่าง",
+
+    "st.up": "ปกติ", "st.unreachable": "เข้าไม่ได้", "st.boundary": "นอกขอบเขต", "st.suspect": "Suspect", "st.down": "หายไป",
+    "mixed": "ผสม",
+    "p.status": "สถานะ", "p.via": "เข้าด้วย", "p.telnetWarn": "ไม่เข้ารหัส — ควรเปิด SSH", "p.model": "รุ่น",
+    "p.parent": "ต่อจาก", "p.lastSeen": "เห็นล่าสุด",
+    "p.term.title": "เปิดแท็บใหม่ใน Windows Terminal · พิมพ์รหัสผ่านเอง", "p.open": "เปิด {p}",
+    "p.ack": "รับทราบ · ลบออกจากแผนที่", "p.del": "ลบออกจากแผนที่",
+    "p.del.title": "ถ้ายังต่ออยู่และอยู่ในขอบเขต crawl จะกลับมาในรอบถัดไป", "p.cables": "สายที่ต่ออยู่ ({n})",
+    "l.count": "{n} สาย", "l.media": "ประเภทสาย", "l.manual": "แก้เอง", "l.manualTitle": "แก้เอง (ระบบตรวจได้: {m})",
+    "l.detected": "ตรวจจาก transceiver", "l.auto": "อัตโนมัติ ({m})", "l.ack": "รับทราบ",
+    "l.hint": "ประเภทสายตรวจจากชนิด SFP/พอร์ตที่ switch รายงาน — เลือกเองได้ถ้าไม่ตรง",
+    "toast.term": "เปิด {p} ไป {ip}{user} แล้ว — ดูที่ Windows Terminal", "toast.term.as": " ด้วย {u}",
+    "confirm.delMany": "ยืนยัน: ลบ {n} อุปกรณ์?", "confirm.del": "ยืนยัน: กดอีกครั้งเพื่อลบ",
+    "confirm.layout": "ยืนยัน: ล้างตำแหน่งที่ลากไว้?", "confirm.clear": "ยืนยัน: กดอีกครั้งเพื่อล้างแผนที่ทั้งหมด",
+    "toast.deleted": "ลบแล้ว {n} อุปกรณ์", "toast.mediaSaved": "บันทึกประเภทสายแล้ว", "toast.notFound": "ไม่พบอุปกรณ์",
+    "toast.cleared": "ล้างแผนที่แล้ว ({n} อุปกรณ์)", "toast.noMap": "ยังไม่มีข้อมูลแผนที่",
+    "toast.exportFail": "Export ไม่สำเร็จ: ", "toast.missing": "ไม่พบ ",
+    "toast.htmlSaved": "บันทึก {f} แล้ว — เปิดด้วย browser เครื่องไหนก็ได้",
+    "toast.scanStarted": "เริ่ม scan แล้ว", "toast.crawlStarted": "เริ่ม crawl แล้ว",
+    "toast.moved": "ล้างแผนที่แล้ว — ใส่ Seed IP / credential ของ site ใหม่ → บันทึก → กด Rescan",
+    "toast.saved": "บันทึกแล้ว — กด Rescan เพื่อ crawl ทันที", "toast.ovSaved": "บันทึก override แล้ว",
+    "toast.pkgOk": "ดาวน์โหลด {f} แล้ว — แตก zip แล้วกด start.bat ได้เลย",
+    "toast.pkgNoPy": "{w} — zip นี้ไม่มี Python เครื่องปลายทางต้องติดตั้ง Python และต่อเน็ตเอง",
+    "toast.dlFail": "ดาวน์โหลดไม่สำเร็จ: ", "toast.more": " และอีก {n}",
+    "status.snapshot": "Snapshot {t} · ดูอย่างเดียว", "status.disconnected": "ขาดการเชื่อมต่อกับ server…",
+    "status.crawling": "กำลัง crawl {a}/{b} switch", "status.paused": "ยังไม่ scan — กด Rescan เพื่อเริ่ม",
+    "status.idle": "ล่าสุด {a} · รอบถัดไป {b}",
+    "pdf.meta": "{sw} switch · {ap} AP · {c} สาย · พิมพ์เมื่อ {now}", "pdf.devices": "อุปกรณ์ ({n})", "pdf.cables": "สาย ({n})",
+    "pdf.name": "ชื่อ", "pdf.type": "ประเภท", "pdf.devA": "อุปกรณ์ A", "pdf.portA": "พอร์ต A", "pdf.devB": "อุปกรณ์ B", "pdf.portB": "พอร์ต B",
+    "ev.k.initial": "Crawl แรก", "ev.k.device_new": "อุปกรณ์ใหม่", "ev.k.device_down": "อุปกรณ์หายไป",
+    "ev.k.device_back": "อุปกรณ์กลับมา", "ev.k.cable_new": "สายใหม่", "ev.k.cable_down": "สายหลุด",
+    "ev.k.cable_back": "สายกลับมา", "ev.k.cable_moved": "ย้ายพอร์ต", "ev.k.login_fail": "ล็อกอินไม่ได้",
+    "ev.k.login_ok": "ล็อกอินได้แล้ว", "ev.k.seed_fail": "Seed เข้าไม่ได้", "ev.k.gap": "ระบบไม่ได้ทำงาน",
+    "ev.k.ack": "รับทราบ", "ev.k.telnet": "เข้าด้วย Telnet", "ev.k.removed": "ลบโดยผู้ใช้",
+    "ev.k.cleared": "ล้างแผนที่", "ev.k.serial_changed": "Serial เปลี่ยน",
+  },
+  en: {
+    "lang.switch": "ไทย", "lang.title": "เปลี่ยนเป็นภาษาไทย",
+    "tab.map": "Map", "tab.events": "Events", "tab.settings": "Settings",
+    "ws.title": "Real-time connection", "status.connecting": "Connecting…",
+    "btn.layout": "Auto layout", "btn.layout.title": "Clear dragged positions and lay out everything again",
+    "btn.fit": "Fit to screen",
+    "btn.pdf.title": "Map + device and cable lists · choose \"Save as PDF\" in the print dialog",
+    "btn.html.title": "A single .html file that opens on any PC without running the program · click for details / search / view events",
+    "search.ph": "Search hostname / IP",
+    "lg.devices": "Devices", "lg.up": "Normal", "lg.suspect": "Suspect (not sure yet)", "lg.down": "Gone (awaiting acknowledge)",
+    "lg.gray": "Unreachable / out of scope", "lg.telnet": "Reached via Telnet (unencrypted)", "lg.cables": "Cables",
+    "lg.mixed": "Mixed types in one Link", "lg.partial": "Some cables down", "lg.alldown": "All cables down",
+    "empty.title": "No topology data yet",
+    "empty.body": 'Go to <a href="#" data-goto="settings">Settings</a>, enter the Seed Switch IP and username/password, then press Rescan',
+    "ev.filter.ph": "Filter…", "ev.col.time": "Time", "ev.col.kind": "Type", "ev.col.subject": "Device / cable", "ev.col.detail": "Details",
+    "ev.none": "No events yet",
+    "set.interval": "Crawl interval (min)", "set.hops": "Max hops", "set.workers": "Parallel SSH",
+    "set.timeout": "Timeout per switch (s)",
+    "set.timeout.title": "Maximum time per switch, from connecting until all commands are read; longer than this counts as unreachable",
+    "set.subnets.hint": "One range per line · empty = no limit", "set.cred.hint": "Used for every switch without an override",
+    "set.clear_enable": "Remove the saved enable secret", "set.telnet": "Try Telnet when SSH is refused",
+    "set.telnet.hint": "Only when port 22 actively refuses · not tried on timeout or wrong password · Telnet sends the password unencrypted",
+    "btn.save": "Save",
+    "set.pwSaved": "•••••• (saved)", "set.pwNone": "not set", "set.enNone": "none (optional)",
+    "ov.title": "Per-switch credentials", "ov.sub": "override the default by IP", "ov.enable.ph": "enable (optional)",
+    "ov.submit": "Add / update",
+    "ov.hint": "To edit an entry, enter the same IP · empty password = keep the current one · a switch with an override uses only the protocol set here (no fallback)",
+    "ov.del": "Delete", "ov.none": "None yet — every switch uses the Default Credential",
+    "clr.title": "Clear map / move to another site", "clr.sub": "deletes every scanned device and cable",
+    "clr.hint": "Before moving to a new site: Export PDF first → change the Seed Switch IP / credentials above and Save → Clear map → Rescan<br>If the Seed IP is not changed, the next crawl scans the old site again · settings and credentials are kept",
+    "clr.events": "Also delete event history", "clr.btn": "Clear the whole map",
+    "pkg.title": "Download the program", "pkg.sub": "run it on another PC / share with teammates",
+    "pkg.hint": "A zip with the program + portable Python built in · unzip and double-click <code>start.bat</code>, nothing to install (Windows 10/11 64-bit)<br>The map, event history and switch username/password are <b>not</b> included — the recipient sets it up from scratch",
+    "pkg.btn": "⬇ Download zip", "pkg.building": "Building… (the first time may take 1–2 minutes)",
+    "key.hint": "Passwords are encrypted in <code>data\\nwd.db</code> with the key <code>data\\secret.key</code> — always back up these two files together",
+    "start.title": "Getting started — not scanned yet", "start.last": "Last configured site:",
+    "start.scan": "⟳ Scan the same site", "start.move": "Move to a new site · clear the old map", "start.view": "View the old map first (no scan yet)",
+    "start.clear": "Also clear the old site's event history (when moving)",
+    "start.hint": "Moving to a new site clears the map and takes you to Settings: enter the new site's Seed IP / credentials → Save → press Rescan<br>Want to keep the old map? Choose \"View the old map first\" and Export PDF before moving",
+    "start.count": "· on map: {sw} switches, {ap} APs", "start.empty": "· map is empty",
+
+    "st.up": "Normal", "st.unreachable": "Unreachable", "st.boundary": "Out of scope", "st.suspect": "Suspect", "st.down": "Gone",
+    "mixed": "mixed",
+    "p.status": "Status", "p.via": "Access", "p.telnetWarn": "unencrypted — enable SSH", "p.model": "Model",
+    "p.parent": "Connected from", "p.lastSeen": "Last seen",
+    "p.term.title": "Opens a new tab in Windows Terminal · type the password yourself", "p.open": "Open {p}",
+    "p.ack": "Acknowledge · remove from map", "p.del": "Remove from map",
+    "p.del.title": "If it is still connected and within crawl scope, it comes back next round", "p.cables": "Connected cables ({n})",
+    "l.count": "{n} cables", "l.media": "Cable type", "l.manual": "manual", "l.manualTitle": "Manual (detected: {m})",
+    "l.detected": "Detected from transceiver", "l.auto": "Auto ({m})", "l.ack": "Acknowledge",
+    "l.hint": "Cable type is detected from the SFP/port type the switch reports — choose it yourself if wrong",
+    "toast.term": "Opened {p} to {ip}{user} — see Windows Terminal", "toast.term.as": " as {u}",
+    "confirm.delMany": "Confirm: delete {n} devices?", "confirm.del": "Confirm: click again to delete",
+    "confirm.layout": "Confirm: clear dragged positions?", "confirm.clear": "Confirm: click again to clear the whole map",
+    "toast.deleted": "Deleted {n} devices", "toast.mediaSaved": "Cable type saved", "toast.notFound": "Device not found",
+    "toast.cleared": "Map cleared ({n} devices)", "toast.noMap": "No map data yet",
+    "toast.exportFail": "Export failed: ", "toast.missing": "Not found: ",
+    "toast.htmlSaved": "Saved {f} — open it in any browser",
+    "toast.scanStarted": "Scan started", "toast.crawlStarted": "Crawl started",
+    "toast.moved": "Map cleared — enter the new site's Seed IP / credentials → Save → press Rescan",
+    "toast.saved": "Saved — press Rescan to crawl now", "toast.ovSaved": "Override saved",
+    "toast.pkgOk": "Downloaded {f} — unzip it and run start.bat",
+    "toast.pkgNoPy": "{w} — this zip has no Python; the target PC must install Python and have internet access",
+    "toast.dlFail": "Download failed: ", "toast.more": " and {n} more",
+    "status.snapshot": "Snapshot {t} · read-only", "status.disconnected": "Lost connection to server…",
+    "status.crawling": "Crawling {a}/{b} switches", "status.paused": "Not scanning yet — press Rescan to start",
+    "status.idle": "Last {a} · next {b}",
+    "pdf.meta": "{sw} switches · {ap} APs · {c} cables · printed {now}", "pdf.devices": "Devices ({n})", "pdf.cables": "Cables ({n})",
+    "pdf.name": "Name", "pdf.type": "Type", "pdf.devA": "Device A", "pdf.portA": "Port A", "pdf.devB": "Device B", "pdf.portB": "Port B",
+    "ev.k.initial": "First crawl", "ev.k.device_new": "New device", "ev.k.device_down": "Device gone",
+    "ev.k.device_back": "Device back", "ev.k.cable_new": "New cable", "ev.k.cable_down": "Cable down",
+    "ev.k.cable_back": "Cable back", "ev.k.cable_moved": "Port moved", "ev.k.login_fail": "Login failed",
+    "ev.k.login_ok": "Login OK", "ev.k.seed_fail": "Seed unreachable", "ev.k.gap": "System not running",
+    "ev.k.ack": "Acknowledged", "ev.k.telnet": "Via Telnet", "ev.k.removed": "Removed by user",
+    "ev.k.cleared": "Map cleared", "ev.k.serial_changed": "Serial changed",
+  },
+};
+
+let LANG = (() => {
+  try { const s = localStorage.getItem("nwd-lang"); if (s === "th" || s === "en") return s; } catch (e) { /* file:// may block storage */ }
+  return /^th\b/i.test(navigator.language || "th") ? "th" : "en";
+})();
+const LOCALE = () => (LANG === "th" ? "th-TH" : "en-GB");
+
+function t(key, vars) {
+  let s = (I18N[LANG] && I18N[LANG][key]) ?? I18N.th[key] ?? key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+  return s;
+}
+
+/* Thai text produced by the server (app/*.py). Longest / most specific first. */
+const SRV_EN = [
+  [/กำลัง crawl อยู่ — รอให้เสร็จก่อนแล้วค่อยล้างแผนที่/g, "A crawl is running — wait for it to finish before clearing the map"],
+  [/กำลัง crawl อยู่/g, "A crawl is already running"],
+  [/ยังไม่ได้ตั้งค่า Seed Switch หรือ username/g, "Seed Switch or username is not set"],
+  [/ยังไม่ได้ตั้งค่า Seed Switch IP/g, "Seed Switch IP is not set"],
+  [/เข้า Seed Switch ไม่ได้: /g, "Cannot reach the Seed Switch: "],
+  [/Crawl ล้มเหลว: /g, "Crawl failed: "],
+  [/: การเปลี่ยนแปลงรอบถัดไปอาจเกิดขึ้นช่วงไหนก็ได้ในระหว่างนี้/g, ": changes found by the next crawl may have happened at any time in this period"],
+  [/ระบบไม่ได้ทำงาน/g, "System was not running"],
+  [/ไม่ตอบภายใน (\S+) วินาที/g, "no response within $1 s"],
+  [/เกิน (\d+) hop/g, "beyond $1 hops"],
+  [/ไม่มี management IP ใน CDP\/LLDP/g, "no management IP in CDP/LLDP"],
+  [/อยู่นอก Allowed Subnets/g, "outside Allowed Subnets"],
+  [/ไม่ได้รับผลการเชื่อมต่อ/g, "no connection result received"],
+  [/IP ไม่ถูกต้อง: /g, "Invalid IP: "],
+  [/(\S+) ต้องเป็นตัวเลข/g, "$1 must be a number"],
+  [/(\S+) ต้องอยู่ระหว่าง (\S+)/g, "$1 must be between $2"],
+  [/Subnet ไม่ถูกต้อง: /g, "Invalid subnet: "],
+  [/ต้องใส่ password/g, "Password is required"],
+  [/protocol ต้องเป็น ssh หรือ telnet/g, "protocol must be ssh or telnet"],
+  [/media ไม่ถูกต้อง/g, "Invalid media type"],
+  [/รับทราบได้เฉพาะอุปกรณ์ที่สถานะ down/g, "Only devices with status down can be acknowledged"],
+  [/รับทราบได้เฉพาะสายที่สถานะ down/g, "Only cables with status down can be acknowledged"],
+  [/ไม่ได้ระบุอุปกรณ์/g, "No device specified"],
+  [/สร้าง Python พกพาได้เฉพาะบน Windows/g, "Portable Python can only be built on Windows"],
+  [/สร้าง Python พกพาไม่สำเร็จ \(ต่อเน็ตไม่ได้\?\)/g, "Could not build portable Python (no internet?)"],
+  [/กำลังสร้างชุดโปรแกรมอยู่แล้ว รอสักครู่/g, "The package is already being built, please wait"],
+  [/สร้าง zip ไม่สำเร็จ: /g, "Could not build zip: "],
+  [/ต้องเป็น JSON/g, "Must be JSON"],
+  [/รองรับเฉพาะ Windows/g, "Windows only"],
+  [/อุปกรณ์นี้ไม่มี IP/g, "This device has no IP"],
+  [/เปิด terminal ไม่ได้: /g, "Could not open terminal: "],
+  [/สายกลับมาแล้ว/g, "cable back"],
+  [/กลับมาแล้ว \(เดิม (\w+)\)/g, "back (was $1)"],
+  [/ล็อกอินได้แล้ว/g, "login OK"],
+  [/เข้าด้วย telnet \(SSH ถูกปฏิเสธหรือกำหนดไว้\)/g, "reached via telnet (SSH refused or configured)"],
+  [/\(เปลี่ยนตัวเครื่อง \/ สมาชิก stack\)/g, "(device replaced / stack member)"],
+  [/สายหลุด \/ ไม่พบใน CDP\/LLDP/g, "cable down / not seen in CDP/LLDP"],
+  [/หายจาก topology/g, "gone from topology"],
+  [/Crawl แรก/g, "First crawl"],
+  [/พบ (\d+) อุปกรณ์, (\d+) สาย/g, "found $1 devices, $2 cables"],
+  [/รับทราบและลบออกจากแผนที่/g, "acknowledged and removed from map"],
+  [/ลบออกจากแผนที่โดยผู้ใช้/g, "removed from map by user"],
+  [/ล้างแผนที่ \((\d+) อุปกรณ์\)/g, "map cleared ($1 devices)"],
+  [/^แผนที่$/g, "Map"],
+];
+function srv(s) {
+  if (LANG === "th" || !s) return s;
+  return SRV_EN.reduce((acc, [re, rep]) => acc.replace(re, rep), String(s));
+}
+
+function applyI18n(root = document) {
+  document.documentElement.lang = LANG;
+  root.querySelectorAll("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
+  root.querySelectorAll("[data-i18n-html]").forEach((el) => (el.innerHTML = t(el.dataset.i18nHtml)));
+  root.querySelectorAll("[data-i18n-title]").forEach((el) => (el.title = t(el.dataset.i18nTitle)));
+  root.querySelectorAll("[data-i18n-ph]").forEach((el) => (el.placeholder = t(el.dataset.i18nPh)));
+}
+
+function setLang(lang) {
+  LANG = lang;
+  try { localStorage.setItem("nwd-lang", lang); } catch (e) { /* ignore */ }
+  applyI18n();
+  document.dispatchEvent(new Event("nwd-lang"));
+}

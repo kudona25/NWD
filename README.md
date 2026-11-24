@@ -17,6 +17,7 @@
 - **Credential เข้ารหัส** — รหัสผ่าน switch เก็บใน SQLite แบบเข้ารหัส (Fernet) กุญแจแยกไฟล์
 - **SSH + Telnet fallback** — ตั้ง credential กลางหรือ override ราย IP ได้
 - **เปิด terminal เข้า switch ได้จากแผนที่** (Windows Terminal / cmd)
+- **หน้าเว็บ 2 ภาษา** — ไทย / อังกฤษ กดปุ่ม **EN / ไทย** มุมขวาบนเพื่อสลับ ระบบจำภาษาที่เลือกไว้ (ไฟล์ Export HTML ก็สลับได้)
 - **ทำงาน offline ได้ทั้งหมด** และมีชุดพกพาที่ไม่ต้องติดตั้ง Python
 - **อ่านอย่างเดียว** — ไม่มีการแก้ config บน switch
 
@@ -95,6 +96,7 @@ app/crawler.py   SSH (Netmiko) + BFS → Snapshot
 app/state.py     เทียบ Snapshot กับแผนที่เดิม และใช้กฎ Suspect/down → Change Event
 app/main.py      FastAPI, scheduler, WebSocket, REST API
 static/          หน้าเว็บ (vis-network เก็บไว้ในเครื่อง ใช้งานได้โดยไม่ต้องต่ออินเทอร์เน็ต)
+static/i18n.js   ข้อความหน้าเว็บภาษาไทย/อังกฤษ + แปลข้อความจาก server
 tests/           pytest + network จำลอง
 ```
 

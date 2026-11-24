@@ -17,22 +17,13 @@ The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 - **Encrypted credentials** — switch passwords are stored in SQLite encrypted with Fernet; the key lives in a separate file
 - **SSH + Telnet fallback** — one default credential, or per-IP overrides
 - **Open a terminal to a switch straight from the map** (Windows Terminal / cmd)
+- **Bilingual UI** — English / Thai, switchable at any time (also in exported HTML files)
 - **Works fully offline**, with a portable build that needs no Python installation
 - **Read-only** — never changes any configuration on the switches
 
 ## Getting started (Windows 11)
 
-> **Note:** the web UI is currently in Thai only. Button names in this README are given in English with the Thai label in brackets, e.g. **Settings** (ตั้งค่า).
-
-| English (this README) | Thai label in the UI |
-|---|---|
-| Settings tab | ตั้งค่า |
-| Save | บันทึก |
-| Rescan | ⟳ Rescan |
-| Acknowledge | รับทราบ |
-| Auto layout | จัดใหม่อัตโนมัติ |
-| Download zip | ⬇ ดาวน์โหลด zip |
-| Try Telnet when SSH is refused | ลอง Telnet เมื่อ SSH ถูกปฏิเสธ |
+> **Language:** the web UI is available in English and Thai. Use the **EN / ไทย** button in the top-right corner to switch; your choice is remembered. On first visit the language follows your browser (Thai browsers get Thai, everything else gets English).
 
 1. Install Python 3.11 or newer from python.org (tick **Add python.exe to PATH** during setup)
 2. Double-click `start.bat`
@@ -107,6 +98,7 @@ app/crawler.py   SSH (Netmiko) + BFS → Snapshot
 app/state.py     compares the Snapshot with the current map and applies Suspect/down rules → Change Events
 app/main.py      FastAPI, scheduler, WebSocket, REST API
 static/          web UI (vis-network is bundled locally, works without internet)
+static/i18n.js   UI text in English/Thai + translation of server messages
 tests/           pytest + simulated network
 ```
 
