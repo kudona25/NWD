@@ -1,5 +1,7 @@
 # NWD — Logical Topology แบบ real-time (CDP + LLDP)
 
+**ภาษาไทย** | [English](README.en.md)
+
 ระบบจะ SSH เข้า **Seed Switch** (core) แล้วอ่าน `show cdp neighbors detail`, `show lldp neighbors detail` และ `show interfaces status` จากนั้นไล่ลงไปทีละ switch แบบ BFS แล้ววาดเป็นแผนที่ที่อัปเดตเองทุก 5 นาที
 คำศัพท์ที่ใช้ในระบบดูได้ที่ [CONTEXT.md](CONTEXT.md)
 
