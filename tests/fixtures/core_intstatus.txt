@@ -1,0 +1,8 @@
+
+Port         Name               Status       Vlan       Duplex  Speed Type 
+Gi1/0/1      to-ISR             connected    routed       a-full a-1000 10/100/1000BaseTX
+Gi1/0/5                         connected    20           a-full a-1000 10/100/1000BaseTX
+Gi1/0/24     to-2960            connected    trunk        a-full a-1000 1000BaseSX SFP
+Te1/1/1      uplink-acc01       connected    trunk          full    10G SFP-10GBase-LR
+Te1/1/2      uplink-acc01       connected    trunk          full    10G SFP-10GBase-LR
+Te1/1/3                         notconnect   1              full    10G SFP-H10GB-CU1M

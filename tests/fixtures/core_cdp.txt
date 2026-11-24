@@ -1,0 +1,97 @@
+-------------------------
+Device ID: SW-ACC-01.example.local
+Entry address(es): 
+  IP address: 10.10.1.11
+Platform: cisco C9200L-48P-4X,  Capabilities: Switch IGMP 
+Interface: TenGigabitEthernet1/1/1,  Port ID (outgoing port): TenGigabitEthernet1/1/1
+Holdtime : 150 sec
+
+Version :
+Cisco IOS Software [Bengaluru], Catalyst L3 Switch Software (CAT9K_LITE_IOSXE), Version 17.6.5, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Thu 23-Mar-23 01:48 by mcpre
+
+advertisement version: 2
+VTP Management Domain: ''
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 10.10.1.11
+
+-------------------------
+Device ID: SW-ACC-01.example.local
+Entry address(es): 
+  IP address: 10.10.1.11
+Platform: cisco C9200L-48P-4X,  Capabilities: Switch IGMP 
+Interface: TenGigabitEthernet1/1/2,  Port ID (outgoing port): TenGigabitEthernet1/1/2
+Holdtime : 150 sec
+
+Version :
+Cisco IOS Software [Bengaluru], Catalyst L3 Switch Software (CAT9K_LITE_IOSXE), Version 17.6.5, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Thu 23-Mar-23 01:48 by mcpre
+
+advertisement version: 2
+VTP Management Domain: ''
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 10.10.1.11
+
+-------------------------
+Device ID: SW-OLD-2960
+Entry address(es): 
+  IP address: 10.10.1.21
+Platform: cisco WS-C2960X-24PS-L,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/24,  Port ID (outgoing port): GigabitEthernet1/0/49
+Holdtime : 170 sec
+
+Version :
+Cisco IOS Software, C2960X Software (C2960X-UNIVERSALK9-M), Version 15.2(7)E8, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Tue 28-Feb-23 06:21 by mcpre
+
+advertisement version: 2
+Protocol Hello:  OUI=0x00000C, Protocol ID=0x0112; payload len=27, value=00000000FFFFFFFF010221FF000000000000F8B7E2C1D280FF0000
+VTP Management Domain: ''
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 10.10.1.21
+
+-------------------------
+Device ID: SEP001122334455
+Entry address(es): 
+  IP address: 10.20.0.50
+Platform: Cisco IP Phone 8841,  Capabilities: Host Phone Two-port Mac Relay 
+Interface: GigabitEthernet1/0/5,  Port ID (outgoing port): Port 1
+Holdtime : 133 sec
+
+Version :
+sip88xx.12-8-1-0001-455
+
+advertisement version: 2
+Duplex: full
+Management address(es): 
+
+-------------------------
+Device ID: FW-EDGE
+Entry address(es): 
+  IP address: 10.10.0.1
+Platform: cisco ISR4331/K9,  Capabilities: Router IGMP 
+Interface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet0/0/1
+Holdtime : 150 sec
+
+Version :
+Cisco IOS XE Software, Version 17.03.04a
+
+advertisement version: 2
+Duplex: full
+Management address(es): 
+  IP address: 10.10.0.1
+
+
+Total cdp entries displayed : 5

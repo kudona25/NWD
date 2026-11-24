@@ -1,0 +1,49 @@
+-------------------------
+Device ID: SW-CORE
+Entry address(es): 
+  IP address: 10.10.1.1
+Platform: cisco C9300-48UXM,  Capabilities: Router Switch IGMP 
+Interface: TenGigabitEthernet1/1/1,  Port ID (outgoing port): TenGigabitEthernet1/1/1
+Holdtime : 150 sec
+
+Version :
+Cisco IOS Software [Bengaluru], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.6.5, RELEASE SOFTWARE (fc2)
+
+advertisement version: 2
+Native VLAN: 1
+Duplex: full
+Management address(es): 
+  IP address: 10.10.1.1
+
+-------------------------
+Device ID: AP-LINE1-01
+Entry address(es): 
+  IP address: 10.30.0.21
+Platform: cisco C9120AXI-S,  Capabilities: Router Trans-Bridge Source-Route-Bridge IGMP 
+Interface: GigabitEthernet1/0/10,  Port ID (outgoing port): GigabitEthernet0
+Holdtime : 120 sec
+
+Version :
+Cisco AP Software, ap3g3-k9w8 Version: 17.6.5.22
+
+advertisement version: 2
+Duplex: full
+Power drawn: 25.500 Watts
+Management address(es): 
+  IP address: 10.30.0.21
+
+-------------------------
+Device ID: Meraki MR46 - WH-AP-02
+Entry address(es): 
+  IP address: 10.30.0.40
+Platform: Meraki MR46 Cloud Managed AP,  Capabilities: Switch 
+Interface: GigabitEthernet1/0/11,  Port ID (outgoing port): Port 0
+Holdtime : 156 sec
+
+Version :
+Meraki MR46 Cloud Managed AP
+
+advertisement version: 2
+Management address(es): 
+
+Total cdp entries displayed : 3

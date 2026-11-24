@@ -1,0 +1,7 @@
+
+Port         Name               Status       Vlan       Duplex  Speed Type 
+Gi1/0/10     AP-LINE1-01        connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/11                        connected    30         a-full a-1000 10/100/1000BaseTX
+Gi1/0/12                        connected    30         a-full a-1000 10/100/1000BaseTX
+Te1/1/1                         connected    trunk        full    10G SFP-10GBase-LR
+Te1/1/2                         connected    trunk        full    10G SFP-10GBase-LR
