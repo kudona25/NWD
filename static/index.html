@@ -84,23 +84,14 @@
       <form id="fSettings" class="card">
         <h3>Crawl</h3>
         <label>Seed Switch IP (core switch)<input name="seed_ip" placeholder="10.10.1.1" required></label>
-        <label><span data-i18n="set.interval">Rescan อัตโนมัติ</span> <small data-i18n="set.interval.hint">นับจาก crawl ครั้งล่าสุด · เปลี่ยนแล้วมีผลทันที · กด Rescan เองได้ตลอด</small>
-          <span class="interval">
-            <span data-i18n="set.every">ทุก</span>
-            <input name="interval_n" type="number" min="1" max="999" step="1">
-            <select name="interval_unit">
-              <option value="1" data-i18n="unit.min">นาที</option>
-              <option value="60" data-i18n="unit.hour">ชั่วโมง</option>
-              <option value="1440" data-i18n="unit.day">วัน</option>
-              <option value="43200" data-i18n="unit.month">เดือน (30 วัน)</option>
-              <option value="0" data-i18n="unit.off">ไม่ rescan อัตโนมัติ (กดเองเท่านั้น)</option>
-            </select>
-          </span></label>
-        <div class="row3">
+        <div class="row4">
+          <label><span data-i18n="set.interval">รอบ crawl (นาที)</span><input name="interval_min" type="number" min="1" max="1440"></label>
           <label><span data-i18n="set.hops">Hop สูงสุด</span><input name="max_hops" type="number" min="1" max="50"></label>
           <label><span data-i18n="set.workers">SSH พร้อมกัน</span><input name="workers" type="number" min="1" max="50"></label>
           <label title="เวลาสูงสุดต่อ switch ตั้งแต่เชื่อมต่อจนอ่านคำสั่งครบ เกินแล้วถือว่าเข้าไม่ได้" data-i18n-title="set.timeout.title"><span data-i18n="set.timeout">Timeout ต่อ switch (วินาที)</span><input name="timeout_sec" type="number" min="10" max="600"></label>
         </div>
+        <label class="check"><input type="checkbox" name="rescan_off"> <span data-i18n="set.rescanOff">ปิด rescan อัตโนมัติ</span>
+          <small data-i18n="set.rescanOff.hint">scan เฉพาะตอนกด Rescan เอง · ค่ารอบ crawl ยังเก็บไว้ เปิดกลับเมื่อไหร่ก็ใช้ค่าเดิม</small></label>
         <label>Allowed Subnets <small data-i18n="set.subnets.hint">บรรทัดละ 1 ช่วง · ว่าง = ไม่จำกัด</small>
           <textarea name="allowed_subnets" rows="3" placeholder="10.10.0.0/16&#10;192.168.50.0/24"></textarea></label>
 

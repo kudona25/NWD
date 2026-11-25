@@ -124,6 +124,11 @@ async def run_crawl(trigger: str):
         await hub.send({"type": "status", "data": status})
 
 
+def _interval_sec() -> int:
+    s = db.get_settings()
+    return s["interval_min"] * 60 if s["auto_rescan"] else 0
+
+
 async def scheduler():
     await resume.wait()
     while True:
@@ -137,7 +142,7 @@ async def scheduler():
         # A changed interval is applied at once — counted from the last crawl — instead of
         # after the old wait ends (which could be a month away).
         while True:
-            interval = db.get_settings()["interval_min"] * 60   # 0 = automatic rescan off
+            interval = _interval_sec()   # 0 = automatic rescan off
             status["next_run"] = last + interval if interval else None
             await hub.send({"type": "status", "data": status})
             resched.clear()
@@ -156,9 +161,9 @@ def record_gap():
     last = db.q("SELECT finished FROM run ORDER BY id DESC LIMIT 1")
     if not last:
         return
-    interval = db.get_settings()["interval_min"] * 60
+    interval = _interval_sec()
     gap = time.time() - last[0]["finished"]
-    if interval and gap > 2 * interval:   # no schedule (interval 0) = no "missed rounds" to report
+    if interval and gap > 2 * interval:   # rescan off = no "missed rounds" to report
         fmt = lambda t: time.strftime("%Y-%m-%d %H:%M", time.localtime(t))
         db.add_event("gap", "ระบบไม่ได้ทำงาน",
                      f'{fmt(last[0]["finished"])} – {fmt(time.time())}: การเปลี่ยนแปลงรอบถัดไปอาจเกิดขึ้นช่วงไหนก็ได้ในระหว่างนี้')
@@ -233,7 +238,7 @@ def get_settings():
         "seed_ip": s["seed_ip"], "interval_min": s["interval_min"], "max_hops": s["max_hops"],
         "workers": s["workers"], "timeout_sec": s["timeout_sec"], "allowed_subnets": s["allowed_subnets"], "username": s["username"],
         "has_password": bool(s["password_enc"]), "has_enable": bool(s["enable_enc"]),
-        "telnet_fallback": s["telnet_fallback"],
+        "telnet_fallback": s["telnet_fallback"], "auto_rescan": s["auto_rescan"],
     }
 
 
@@ -248,16 +253,19 @@ def _check_ip(ip: str) -> str:
 async def put_settings(body: dict = Body(...)):
     if "seed_ip" in body:
         db.set_setting("seed_ip", _check_ip(body["seed_ip"]) if body["seed_ip"] else "")
+    before = _interval_sec()
     if "interval_min" in body:
         try:
             v = int(body["interval_min"])
         except (TypeError, ValueError):
-            raise HTTPException(400, "รอบ rescan ต้องเป็นตัวเลข")
-        if not 0 <= v <= db.INTERVAL_MAX_MIN:
-            raise HTTPException(400, "รอบ rescan ต้องอยู่ระหว่าง 1 นาที ถึง 12 เดือน (หรือปิด)")
-        if v != db.get_settings()["interval_min"]:
-            db.set_setting("interval_min", v)
-            resched.set()   # the scheduler re-plans the next crawl now
+            raise HTTPException(400, "รอบ crawl ต้องเป็นตัวเลข")
+        if not 1 <= v <= db.INTERVAL_MAX_MIN:
+            raise HTTPException(400, f"รอบ crawl ต้องอยู่ระหว่าง 1-{db.INTERVAL_MAX_MIN} นาที")
+        db.set_setting("interval_min", v)
+    if "auto_rescan" in body:
+        db.set_setting("auto_rescan", "1" if body["auto_rescan"] else "0")
+    if _interval_sec() != before:
+        resched.set()   # the scheduler re-plans the next crawl now, not after the old wait
     for k, lo, hi in (("max_hops", 1, 50), ("workers", 1, 50), ("timeout_sec", 10, 600)):
         if k in body:
             try:

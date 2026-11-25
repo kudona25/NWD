@@ -56,7 +56,8 @@ const mediaColor = (m) => css({ UTP: "--utp", MM: "--mm", SM: "--sm", DAC: "--da
 const LAYOUT = {
   levelH: 170, nodeW: 190, nodeH: 70, apW: 120, apRowH: 62, apCols: 6, apTop: 110,
   leafCols: 4, leafColW: 215, leafRowH: 95, // switches with nothing below them wrap into a grid
-  gap: 50, groupGapX: 150, groupGapY: 170, groupPad: 26,
+  gap: 90, groupGapX: 150, groupGapY: 170, groupPad: 26, subPad: 12,
+  subMin: 5,                        // a sub-branch with this many devices gets its own box inside its group
 };
 let groups = []; // [{key, name, members: [device keys], box}] — one per branch under the seed
 let gridLinks = new Set(); // Link ids parent→AP / parent→end switch inside a grid: drawn straight, never bent
@@ -196,11 +197,20 @@ function autoLayout(devices) {
   }
   const members = (d) => [d.key, ...tree[d.key].flatMap(members)];
   groups = [];
+  // a group, then (depth-first) a nested box for each sub-branch big enough to need one,
+  // so e.g. a building's floors stay visibly apart inside the building's box
+  const addGroup = (d, depth, hue) => {
+    groups.push({ key: d.key, name: d.name, members: members(d), depth, hue });
+    for (const k of tree[d.key]) {
+      if (k.kind !== "ap" && members(k).length >= L.subMin) addGroup(k, depth + 1, hue);
+    }
+  };
+  let gi = 0;
   for (const row of rows) {
     let x = -row.w / 2;
     for (const g of row.items) {
       place(g.d, x, y);
-      groups.push({ key: g.d.key, name: g.d.name, members: members(g.d) });
+      addGroup(g.d, 0, (205 + gi++ * 137.508) % 360);
       x += g.p.w + L.groupGapX;
     }
     y += Math.max(...row.items.map((g) => g.p.h)) + L.groupGapY;
@@ -211,9 +221,10 @@ function autoLayout(devices) {
 /* ---------- group boxes behind the devices; they follow the devices when dragged */
 function drawGroups(ctx) {
   if (!groups.length) return;
-  const pad = LAYOUT.groupPad;
   ctx.save();
-  groups.forEach((g, i) => {
+  groups.forEach((g) => {
+    const sub = g.depth > 0;
+    const pad = sub ? LAYOUT.subPad : LAYOUT.groupPad, head = sub ? 18 : 22;
     let b = null;
     for (const k of g.members) {
       if (!nodes.get(k)) continue;
@@ -221,23 +232,26 @@ function drawGroups(ctx) {
       b = b ? { left: Math.min(b.left, bb.left), top: Math.min(b.top, bb.top), right: Math.max(b.right, bb.right), bottom: Math.max(b.bottom, bb.bottom) } : { ...bb };
     }
     if (!b) { g.box = null; return; }
-    const hue = (205 + i * 137.508) % 360;
-    g.box = { x: b.left - pad, y: b.top - pad - 22, w: b.right - b.left + 2 * pad, h: b.bottom - b.top + 2 * pad + 22 };
+    const hue = g.hue;
+    g.box = { x: b.left - pad, y: b.top - pad - head, w: b.right - b.left + 2 * pad, h: b.bottom - b.top + 2 * pad + head };
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(g.box.x, g.box.y, g.box.w, g.box.h, 14); else ctx.rect(g.box.x, g.box.y, g.box.w, g.box.h);
-    ctx.fillStyle = `hsla(${hue}, 55%, 55%, 0.07)`;
+    if (ctx.roundRect) ctx.roundRect(g.box.x, g.box.y, g.box.w, g.box.h, sub ? 10 : 14); else ctx.rect(g.box.x, g.box.y, g.box.w, g.box.h);
+    ctx.fillStyle = `hsla(${hue}, 55%, 55%, ${sub ? 0.06 : 0.07})`;
     ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = `hsla(${hue}, 55%, 62%, 0.45)`;
+    ctx.lineWidth = sub ? 1.2 : 1.5;
+    ctx.setLineDash(sub ? [6, 4] : []);
+    ctx.strokeStyle = `hsla(${hue}, 55%, 62%, ${sub ? 0.4 : 0.45})`;
     ctx.stroke();
-    ctx.font = `600 14px ${css("--font")}`;
+    ctx.setLineDash([]);
+    ctx.font = `600 ${sub ? 12 : 14}px ${css("--font")}`;
     ctx.textBaseline = "top";
     ctx.fillStyle = `hsla(${hue}, 65%, 72%, 0.95)`;
-    ctx.fillText(`${g.name} · ${g.members.length}`, g.box.x + 12, g.box.y + 8);
+    ctx.fillText(`${g.name} · ${g.members.length}`, g.box.x + (sub ? 8 : 12), g.box.y + (sub ? 4 : 8));
   });
   ctx.restore();
 }
-const groupAt = (pt) => groups.find((g) => g.box && pt.x >= g.box.x && pt.x <= g.box.x + g.box.w && pt.y >= g.box.y && pt.y <= g.box.y + g.box.h);
+// the innermost box under the pointer (sub-branches are listed after their group)
+const groupAt = (pt) => groups.findLast((g) => g.box && pt.x >= g.box.x && pt.x <= g.box.x + g.box.w && pt.y >= g.box.y && pt.y <= g.box.y + g.box.h);
 
 /* ---------- group cables into Links (one per device pair) */
 function buildLinks(cables) {
@@ -830,27 +844,8 @@ $("#evFilter").oninput = () => renderEvents();
 async function loadEvents() { events = await api("GET", "/api/events"); renderEvents(); }
 
 /* ============================================================ settings */
-/* rescan interval: stored as minutes (0 = off); shown as number + unit (month = 30 days) */
-const INTERVAL_UNITS = [43200, 1440, 60, 1];
-const INTERVAL_MAX = 12 * 43200;
-function setInterval_(f, min) {
-  const unit = min ? INTERVAL_UNITS.find((u) => min % u === 0) : 0;
-  f.interval_unit.value = String(unit);
-  f.interval_n.value = min ? min / unit : "";
-  f.interval_n.disabled = !min;
-}
-function getInterval(f) {
-  const unit = +f.interval_unit.value;
-  if (!unit) return 0;
-  const n = Number(f.interval_n.value);
-  if (!Number.isInteger(n) || n < 1 || n * unit > INTERVAL_MAX) return null;
-  return n * unit;
-}
-$("#fSettings").interval_unit.onchange = (e) => {
-  const f = e.target.form, off = e.target.value === "0";
-  f.interval_n.disabled = off;
-  if (!off && !f.interval_n.value) f.interval_n.value = 1;
-};
+// rescan off: the minutes box is greyed out but keeps its value for when it is switched back on
+$("#fSettings").rescan_off.onchange = (e) => (e.target.form.interval_min.disabled = e.target.checked);
 // "3 Dec 14:05" when the next run is not today, "14:05" when it is
 const whenAt = (ts) => {
   if (!ts) return "-";
@@ -871,7 +866,9 @@ async function loadSettings() {
   const s = await api("GET", "/api/settings");
   lastSettings = s;
   const f = $("#fSettings");
-  setInterval_(f, s.interval_min);
+  f.interval_min.value = s.interval_min;
+  f.rescan_off.checked = !s.auto_rescan;
+  f.interval_min.disabled = !s.auto_rescan;
   f.seed_ip.value = s.seed_ip; f.max_hops.value = s.max_hops;
   f.workers.value = s.workers; f.timeout_sec.value = s.timeout_sec; f.allowed_subnets.value = s.allowed_subnets.join("\n"); f.username.value = s.username;
   f.password.value = ""; f.enable.value = ""; f.clear_enable.checked = false; f.telnet_fallback.checked = s.telnet_fallback;
@@ -882,10 +879,9 @@ $("#fSettings").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
-    const interval_min = getInterval(f);
-    if (interval_min === null) { f.interval_n.focus(); return toast(t("set.interval.bad"), true); }
     await api("PUT", "/api/settings", {
-      seed_ip: f.seed_ip.value.trim(), interval_min, max_hops: +f.max_hops.value,
+      seed_ip: f.seed_ip.value.trim(), interval_min: +f.interval_min.value, auto_rescan: !f.rescan_off.checked,
+      max_hops: +f.max_hops.value,
       workers: +f.workers.value, timeout_sec: +f.timeout_sec.value, allowed_subnets: f.allowed_subnets.value.split(/\s*\n\s*/).filter(Boolean),
       username: f.username.value, password: f.password.value, enable: f.enable.value, clear_enable: f.clear_enable.checked,
       telnet_fallback: f.telnet_fallback.checked,

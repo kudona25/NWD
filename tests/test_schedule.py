@@ -20,14 +20,23 @@ def put(**body):
     return asyncio.run(main.put_settings(body))
 
 
-def test_interval_default_and_units():
-    assert db.get_settings()["interval_min"] == 5
-    for minutes in (0, 1, 90, 3 * 60, 2 * 1440, 6 * 43200, db.INTERVAL_MAX_MIN):
+def test_interval_default_and_range():
+    s = db.get_settings()
+    assert s["interval_min"] == 5 and s["auto_rescan"] is True
+    for minutes in (1, 90, 1440):
         put(interval_min=minutes)
         assert db.get_settings()["interval_min"] == minutes
 
 
-@pytest.mark.parametrize("bad", [-1, db.INTERVAL_MAX_MIN + 1, "abc", None])
+def test_turning_rescan_off_keeps_the_interval():
+    put(interval_min=30, auto_rescan=False)
+    s = db.get_settings()
+    assert s["auto_rescan"] is False and s["interval_min"] == 30
+    put(auto_rescan=True)
+    assert db.get_settings()["auto_rescan"] is True and db.get_settings()["interval_min"] == 30
+
+
+@pytest.mark.parametrize("bad", [0, -1, 1441, "abc", None])
 def test_interval_rejected(bad):
     put(interval_min=60)
     with pytest.raises(HTTPException):
@@ -59,8 +68,8 @@ def run_scheduler(monkeypatch, steps):
     asyncio.run(go())
 
 
-def test_interval_off_waits_for_manual_rescan(monkeypatch):
-    db.set_setting("interval_min", 0)
+def test_rescan_off_waits_for_manual_rescan(monkeypatch):
+    db.set_setting("auto_rescan", "0")
 
     async def steps(crawls):
         await asyncio.sleep(0.2)
@@ -72,14 +81,14 @@ def test_interval_off_waits_for_manual_rescan(monkeypatch):
     run_scheduler(monkeypatch, steps)
 
 
-def test_changed_interval_applies_immediately(monkeypatch):
-    db.set_setting("interval_min", 43200)       # a month
+def test_turning_off_applies_immediately(monkeypatch):
+    db.set_setting("interval_min", 1440)
 
     async def steps(crawls):
         await asyncio.sleep(0.2)
         assert len(crawls) == 1
         assert main.status["next_run"] > 0
-        await main.put_settings({"interval_min": 0})   # switch off: re-planned without crawling
+        await main.put_settings({"auto_rescan": False})   # re-planned at once, without crawling
         await asyncio.sleep(0.1)
         assert len(crawls) == 1 and main.status["next_run"] is None
     run_scheduler(monkeypatch, steps)

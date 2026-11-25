@@ -66,9 +66,10 @@ DEFAULTS = {
     "password_enc": "",
     "enable_enc": "",
     "telnet_fallback": "0",
+    "auto_rescan": "1",   # 0 = crawl only on Rescan; interval_min is kept for when it is turned back on
 }
 
-INTERVAL_MAX_MIN = 12 * 30 * 24 * 60  # 12 "months" of 30 days
+INTERVAL_MAX_MIN = 1440
 
 # columns added after v1 — ALTER existing databases
 MIGRATIONS = [
@@ -120,9 +121,8 @@ def tx(fn):
 
 def get_settings() -> dict:
     s = {r["key"]: r["value"] for r in q("SELECT key, value FROM settings")}
-    # minutes between automatic crawls; 0 = off (manual Rescan only)
-    v = s.get("interval_min")
-    s["interval_min"] = max(0, min(INTERVAL_MAX_MIN, int(v))) if v not in (None, "") else 5
+    s["interval_min"] = max(1, min(INTERVAL_MAX_MIN, int(s["interval_min"] or 5)))
+    s["auto_rescan"] = s.get("auto_rescan", "1") != "0"
     s["max_hops"] = max(1, int(s["max_hops"] or 10))
     s["workers"] = max(1, min(50, int(s["workers"] or 10)))
     s["timeout_sec"] = max(10, min(600, int(s.get("timeout_sec") or 60)))
