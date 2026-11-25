@@ -148,6 +148,16 @@ app = FastAPI(title="NWD Topology", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+@app.middleware("http")
+async def no_stale_ui(request: Request, call_next):
+    # Without this the browser may keep running an old app.js after an update.
+    # no-cache = always revalidate (a cheap 304 when nothing changed), not "never cache".
+    resp = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
