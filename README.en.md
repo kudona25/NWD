@@ -10,13 +10,16 @@ The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 ## Features
 
 - **Automatic topology discovery** — starts at the Seed Switch and follows CDP/LLDP neighbors breadth-first across the whole site
-- **Real-time updates** — automatic rescan every N minutes / hours / days / months (up to 12 months), or off so it only scans when you press Rescan; changes are pushed to the web page over WebSocket. A new interval applies immediately, counted from the last crawl
+- **Real-time updates** — automatic rescan every N minutes (1–1440), or turned off so it only scans when you press Rescan; changes are pushed to the web page over WebSocket
+- **Automatic grouping** — switches are grouped by the branch they hang off the Seed Switch, each in a labelled coloured box, with nested boxes for sub-branches
+- **Box select** — Shift + drag to select several devices and move them together, or double-click a box to select the whole group
 - **Change detection** — devices or cables that appear, disappear or move port are recorded as Change Events, with a Suspect state to avoid false alarms
 - **Cable media types** — UTP / Fiber MM / Fiber SM / DAC inferred from the SFP type, overridable per cable
 - **Access point support** — APs (e.g. Cisco, Aruba) seen via CDP/LLDP appear as leaves on the map; NWD never logs in to them
 - **Encrypted credentials** — switch passwords are stored in SQLite encrypted with Fernet; the key lives in a separate file
 - **SSH + Telnet fallback** — one default credential, or per-IP overrides
 - **Open a terminal to a switch straight from the map** (Windows Terminal / cmd)
+- **Export PDF / HTML** — PDF = map + device and cable tables · HTML = a single file that opens on any PC without running the program, with details, search and events
 - **Bilingual UI** — English / Thai, switchable at any time (also in exported HTML files)
 - **Works fully offline**, with a portable build that needs no Python installation
 - **Read-only** — never changes any configuration on the switches
@@ -31,6 +34,19 @@ The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 3. Go to the **Settings** tab, enter the Seed Switch IP, username/password/enable and Allowed Subnets, click **Save**, then **Rescan**
 
 To stop the system, close the cmd window.
+
+Every time the program starts it **does not scan** until you press Rescan or choose in the startup dialog (shown once a site has been configured), so it never logs in to the previous site's switches by accident after you move to another site:
+- **Scan the same site** — carry on scanning with the saved settings
+- **Move to a new site** — clear the old map and go to Settings to enter the new site's Seed IP / credentials
+- **View the old map first** — look at or export the old map without scanning
+
+### Updating the program
+
+1. Close the NWD cmd window and run `start.bat` again (the server only loads new code when it starts)
+2. Press **Ctrl + F5** once in the browser
+3. Check the **Running server version** line at the bottom of the **Settings** tab (commit + date). If it still shows the old value, the server has not been restarted
+
+The map, event history and credentials live in `data\` and are not touched by an update.
 
 ### Portable build (no Python needed on the target PC)
 
@@ -58,6 +74,14 @@ If exceeded, that switch is marked "unreachable" with the note `TimeoutError` an
 If nothing answers at all (wrong IP or blocked by a firewall), NWD gives up on its own within about 8 seconds.
 If a switch is genuinely slow (long link or high CPU) and times out often, increase this value.
 
+### Automatic rescan
+
+- **Crawl interval (min)** in the Settings tab: default 5 minutes, range 1–1440 (up to 1 day)
+- Tick **Turn off automatic rescan** to scan only when you press **Rescan**. The interval is kept, so turning it back on uses the same value
+- Changing the interval or turning it on/off applies immediately, counted from the last crawl — no need to wait for the old round to finish
+- The status bar (top right) shows the last crawl and the next one (with the date if it is not today), or "auto rescan off"
+- **Rescan** works at any time, whether automatic rescan is on or off
+
 ### Telnet
 
 Two modes:
@@ -84,17 +108,21 @@ Cable type is inferred from the SFP type reported by the switch; if it is wrong,
 
 ### Groups and positioning
 
-- **Automatic groups:** every switch connected directly to the Seed Switch that has devices below it forms a group (its whole subtree), drawn in a coloured box with its name and device count. Groups are packed into several rows instead of one long line
-- End switches with nothing below them, and APs, are arranged in a grid under their parent switch
+- **Automatic groups:** every switch connected directly to the Seed Switch that has devices below it forms a group (its whole subtree), drawn in a coloured box with its name and device count. Groups are packed into several rows, smaller ones on top and the biggest at the bottom
+- **Sub-branch boxes:** inside a group, every sub-branch with 5 or more devices gets its own dashed box (e.g. building F32 hanging off F31), so branches stay visibly apart
+- End switches with nothing below them, and APs, are arranged in a grid under their parent switch, with straight lines
 - **Box select:** hold **Shift and drag** on an empty part of the map (Ctrl+Shift adds to the selection), then drag any selected device to move them all together
-- **Double-click inside a group box** selects the whole group · **Esc** clears the selection
-- Drag devices anywhere and NWD remembers their positions. To return to automatic layout, press **Auto layout** twice
+- **Double-click inside a box** selects everything in it (for nested boxes, the innermost one you clicked) · **Esc** clears the selection
+- Drag devices anywhere and NWD remembers their positions
+- **Auto layout** (one click) clears all dragged positions and lays everything out again. Pressed it by mistake? Click **Undo** in the message at the bottom within 10 seconds to get the old positions back
 
 ## Data files
 
 All data lives in the `data\` folder:
 - `nwd.db` (SQLite) stores the topology, events and encrypted credentials
 - `secret.key` is the key used to decrypt passwords. **Always back it up together with nwd.db** — if it is lost, all passwords must be entered again
+
+Export HTML files (`NWD-<seed>-<date_time>.html`) contain real network data (hostnames, IPs, models, serials) but no credentials.
 
 ## Code layout
 
@@ -105,7 +133,7 @@ app/state.py     compares the Snapshot with the current map and applies Suspect/
 app/main.py      FastAPI, scheduler, WebSocket, REST API
 static/          web UI (vis-network is bundled locally, works without internet)
 static/i18n.js   UI text in English/Thai + translation of server messages
-tests/           pytest + simulated network
+tests/           pytest + simulated network (test_schedule.py = rescan interval)
 ```
 
 Testing without real switches:
@@ -135,11 +163,11 @@ The web UI talks to the backend through the following API (all served at `127.0.
 |---|---|---|
 | GET | `/api/topology` | All devices and cables on the map |
 | GET | `/api/events?limit=300` | Recent Change Events |
-| GET | `/api/status` | Current crawl status |
+| GET | `/api/status` | Current crawl status, next run time, server version |
 | POST | `/api/rescan` | Start a crawl now |
-| GET / PUT | `/api/settings` | Read/save Seed, credentials, Allowed Subnets, timeout |
+| GET / PUT | `/api/settings` | Read/save Seed, credentials, Allowed Subnets, timeout, crawl interval (`interval_min`), automatic rescan on/off (`auto_rescan`) |
 | GET / PUT / DELETE | `/api/overrides` | Per-IP credential/protocol |
-| POST / DELETE | `/api/positions` | Save/clear manually dragged device positions |
+| POST / DELETE | `/api/positions` | Save/clear manually dragged device positions (`?push=1` = send the new map to every open page, used by Undo) |
 | POST | `/api/cables/media` | Change a cable's media type |
 | POST | `/api/cables/ack` | Acknowledge a down cable |
 | POST | `/api/devices/ack` | Acknowledge a gone device |
@@ -152,6 +180,7 @@ The web UI talks to the backend through the following API (all served at `127.0.
 ## Security
 
 - Never commit the `data\` folder to git (it holds credentials and `secret.key`) — `.gitignore` already excludes it
+- Export HTML files (`NWD-*.html`) contain real network data — `.gitignore` excludes them too; take care when sharing them outside your team
 - The server binds to `127.0.0.1` only. To expose it to other machines, put it behind your own reverse proxy with authentication
 - Use a switch account with the least privilege that can still run the `show` commands
 
