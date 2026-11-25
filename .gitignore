@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 data-fake/
 runtime/
+
+# exported maps contain real site data
+NWD-*.html

@@ -45,7 +45,13 @@ const statusName = (s) => (["up", "unreachable", "boundary", "suspect", "down"].
 const MEDIA_TH = { UTP: "UTP", MM: "Fiber MM", SM: "Fiber SM", DAC: "DAC", Unknown: "Unknown" };
 const mediaColor = (m) => css({ UTP: "--utp", MM: "--mm", SM: "--sm", DAC: "--dac" }[m] || "--gray");
 
-const LAYOUT = { levelH: 170, nodeW: 190, apW: 120, apRowH: 62, apCols: 6, apTop: 110 };
+const LAYOUT = {
+  levelH: 170, nodeW: 190, nodeH: 70, apW: 120, apRowH: 62, apCols: 6, apTop: 110,
+  leafCols: 4, leafColW: 215, leafRowH: 95, // switches with nothing below them wrap into a grid
+  gap: 50, groupGapX: 150, groupGapY: 170, groupPad: 26,
+};
+let groups = []; // [{key, name, members: [device keys], box}] — one per branch under the seed
+let gridLinks = new Set(); // Link ids parent→AP / parent→end switch inside a grid: drawn straight, never bent
 
 let topo = { devices: [], cables: [], seed: "" };
 let nodes = new vis.DataSet();
@@ -80,64 +86,150 @@ function nodeStyle(d) {
 }
 const shortPlatform = (p) => p.replace(/^cisco\s+/i, "").replace(/^Cisco\s+/i, "").slice(0, 28);
 
-/* ---------- tree layout: seed on top, switch children in next row, APs in a grid under their switch */
+/* ---------- grouped layout
+   Seed on top. Every switch directly under the seed that has something below it starts a Group
+   (its whole subtree), drawn in its own box; Groups are packed into rows instead of one long line.
+   Inside a subtree: APs in a grid under their switch, switches with nothing below them in a grid,
+   switches with their own children side by side. Sets `groups`; returns {key: {x, y}}. */
 function autoLayout(devices) {
+  const L = LAYOUT;
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
   const byKey = Object.fromEntries(devices.map((d) => [d.key, d]));
-  const kids = {};
+  const rawKids = {};
   const roots = [];
   for (const d of devices) {
-    if (d.parent && byKey[d.parent] && d.parent !== d.key) (kids[d.parent] ||= []).push(d);
+    if (d.parent && byKey[d.parent] && d.parent !== d.key) (rawKids[d.parent] ||= []).push(d);
     else roots.push(d);
   }
-  for (const k in kids) kids[k].sort((a, b) => a.name.localeCompare(b.name));
-  roots.sort((a, b) => (a.hop ?? 99) - (b.hop ?? 99) || a.name.localeCompare(b.name));
-
-  const pos = {};
+  // each device exactly once, even if parent links loop
+  const tree = {};
   const seen = new Set();
-  const apBlockW = (n) => Math.min(n, LAYOUT.apCols) * LAYOUT.apW;
-
-  function width(d) {
-    if (seen.has(d.key)) return 0;
+  const build = (d) => {
     seen.add(d.key);
-    const c = kids[d.key] || [];
+    tree[d.key] = (rawKids[d.key] || []).filter((k) => !seen.has(k.key)).sort(byName);
+    tree[d.key].forEach((k) => seen.add(k.key));
+    tree[d.key].forEach(build);
+  };
+  roots.sort((a, b) => (a.hop ?? 99) - (b.hop ?? 99) || byName(a, b)).forEach(build);
+  for (const d of devices) if (!seen.has(d.key)) { roots.push(d); build(d); }
+
+  const plan = {};
+  function measure(d, c = tree[d.key]) {
     const aps = c.filter((x) => x.kind === "ap");
     const sws = c.filter((x) => x.kind !== "ap");
-    let w = 0;
-    if (aps.length) w += apBlockW(aps.length);
-    for (const s of sws) w += width(s);
-    d._w = Math.max(LAYOUT.nodeW, w);
-    return d._w;
+    const leafs = sws.filter((x) => !tree[x.key].length);
+    const subs = sws.filter((x) => tree[x.key].length);
+    subs.forEach((s) => measure(s));
+    const apCols = Math.min(aps.length, L.apCols);
+    const apW = apCols * L.apW, apH = Math.ceil(aps.length / L.apCols) * L.apRowH;
+    // few end switches: one row; many: a roughly 3:2 grid, at most leafCols+2 wide
+    const leafCols = leafs.length <= L.leafCols ? leafs.length : Math.min(L.leafCols + 2, Math.ceil(Math.sqrt(leafs.length) * 1.5));
+    const leafW = leafCols * L.leafColW, leafH = Math.ceil(leafs.length / Math.max(1, leafCols)) * L.leafRowH;
+    // the end-switch grid goes in the middle, right under its parent; branches split left / right by width
+    const subW = subs.reduce((a, s) => a + plan[s.key].w, 0);
+    let split = 0;
+    for (let acc = 0; split < subs.length && acc + plan[subs[split].key].w / 2 <= subW / 2; split++) acc += plan[subs[split].key].w;
+    const order = [...subs.slice(0, split), ...(leafs.length ? ["grid"] : []), ...subs.slice(split)];
+    const blocks = order.map((o) => (o === "grid" ? leafW : plan[o.key].w));
+    const rowW = blocks.reduce((a, b) => a + b, 0) + L.gap * Math.max(0, blocks.length - 1);
+    const childTop = aps.length ? Math.max(L.levelH, L.apTop + apH + 40) : L.levelH;
+    const rowH = Math.max(leafs.length ? leafH : 0, ...subs.map((s) => plan[s.key].h));
+    return (plan[d.key] = {
+      aps, leafs, subs, order, apCols, apW, leafCols, leafW, rowW, childTop,
+      w: Math.max(L.nodeW, apW, rowW),
+      h: blocks.length ? childTop + rowH : aps.length ? L.apTop + apH : L.nodeH,
+    });
   }
-  function place(d, left, depth) {
-    pos[d.key] = { x: left + d._w / 2, y: depth * LAYOUT.levelH };
-    const c = kids[d.key] || [];
-    const aps = c.filter((x) => x.kind === "ap");
-    const sws = c.filter((x) => x.kind !== "ap" && x._w !== undefined);
-    let used = (aps.length ? apBlockW(aps.length) : 0) + sws.reduce((a, s) => a + s._w, 0);
-    let x = left + (d._w - used) / 2;
-    if (aps.length) {
-      const cols = Math.min(aps.length, LAYOUT.apCols);
-      aps.forEach((a, i) => {
-        pos[a.key] = {
-          x: x + (i % cols) * LAYOUT.apW + LAYOUT.apW / 2,
-          y: depth * LAYOUT.levelH + LAYOUT.apTop + Math.floor(i / cols) * LAYOUT.apRowH,
-        };
-      });
-      x += apBlockW(aps.length);
+  const pos = {};
+  function place(d, left, top) {
+    const p = plan[d.key];
+    pos[d.key] = { x: left + p.w / 2, y: top };
+    const linkId = (k) => [d.key, k].sort().join("§");
+    const ax = left + (p.w - p.apW) / 2;
+    p.aps.forEach((a, i) => {
+      pos[a.key] = { x: ax + (i % p.apCols) * L.apW + L.apW / 2, y: top + L.apTop + Math.floor(i / p.apCols) * L.apRowH };
+      gridLinks.add(linkId(a.key));
+    });
+    let x = left + (p.w - p.rowW) / 2;
+    const y = top + p.childTop;
+    for (const o of p.order) {
+      if (o === "grid") {
+        p.leafs.forEach((s, i) => {
+          pos[s.key] = { x: x + (i % p.leafCols) * L.leafColW + L.leafColW / 2, y: y + Math.floor(i / p.leafCols) * L.leafRowH };
+          gridLinks.add(linkId(s.key));
+        });
+        x += p.leafW + L.gap;
+      } else { place(o, x, y); x += plan[o.key].w + L.gap; }
     }
-    for (const s of sws) { place(s, x, depth + 1); x += s._w; }
   }
-  // seed tree first, then orphans (e.g. a switch whose parent was acknowledged away)
-  let left = 0;
-  for (const r of roots) {
-    const w = width(r);
-    if (!w) continue;
-    place(r, left, r.hop === 0 ? 0 : Math.max(1, r.hop ?? 1));
-    left += w + 60;
+  gridLinks = new Set();
+
+  // seed + its lone switches / APs at the top; every branch below the seed is a Group
+  const seed = roots[0] && roots[0].hop === 0 ? roots[0] : null;
+  let groupRoots = roots.filter((r) => r !== seed);
+  let y = 0;
+  if (seed) {
+    groupRoots = [...tree[seed.key].filter((k) => tree[k.key].length), ...groupRoots];
+    const p = measure(seed, tree[seed.key].filter((k) => !tree[k.key].length));
+    place(seed, -p.w / 2, 0);
+    y = p.h + L.groupGapY;
   }
-  for (const d of devices) delete d._w;
+  // shorter groups first: rows of similar height pack tighter, and the biggest branch ends up at the
+  // bottom where the seed's lines to the other groups don't have to cross it
+  const gs = groupRoots.map((d) => ({ d, p: measure(d) })).sort((a, b) => a.p.h - b.p.h || byName(a.d, b.d));
+  // pack Groups into rows about twice as wide as tall (screens are wide)
+  const area = gs.reduce((a, g) => a + (g.p.w + L.groupGapX) * (g.p.h + L.groupGapY), 0);
+  const limit = Math.max(Math.sqrt(area * 2), ...gs.map((g) => g.p.w));
+  const rows = [];
+  for (const g of gs) {
+    const row = rows[rows.length - 1];
+    if (row && row.w + L.groupGapX + g.p.w <= limit) { row.items.push(g); row.w += L.groupGapX + g.p.w; }
+    else rows.push({ items: [g], w: g.p.w });
+  }
+  const members = (d) => [d.key, ...tree[d.key].flatMap(members)];
+  groups = [];
+  for (const row of rows) {
+    let x = -row.w / 2;
+    for (const g of row.items) {
+      place(g.d, x, y);
+      groups.push({ key: g.d.key, name: g.d.name, members: members(g.d) });
+      x += g.p.w + L.groupGapX;
+    }
+    y += Math.max(...row.items.map((g) => g.p.h)) + L.groupGapY;
+  }
   return pos;
 }
+
+/* ---------- group boxes behind the devices; they follow the devices when dragged */
+function drawGroups(ctx) {
+  if (!groups.length) return;
+  const pad = LAYOUT.groupPad;
+  ctx.save();
+  groups.forEach((g, i) => {
+    let b = null;
+    for (const k of g.members) {
+      if (!nodes.get(k)) continue;
+      const bb = network.getBoundingBox(k);
+      b = b ? { left: Math.min(b.left, bb.left), top: Math.min(b.top, bb.top), right: Math.max(b.right, bb.right), bottom: Math.max(b.bottom, bb.bottom) } : { ...bb };
+    }
+    if (!b) { g.box = null; return; }
+    const hue = (205 + i * 137.508) % 360;
+    g.box = { x: b.left - pad, y: b.top - pad - 22, w: b.right - b.left + 2 * pad, h: b.bottom - b.top + 2 * pad + 22 };
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(g.box.x, g.box.y, g.box.w, g.box.h, 14); else ctx.rect(g.box.x, g.box.y, g.box.w, g.box.h);
+    ctx.fillStyle = `hsla(${hue}, 55%, 55%, 0.07)`;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `hsla(${hue}, 55%, 62%, 0.45)`;
+    ctx.stroke();
+    ctx.font = `600 14px ${css("--font")}`;
+    ctx.textBaseline = "top";
+    ctx.fillStyle = `hsla(${hue}, 65%, 72%, 0.95)`;
+    ctx.fillText(`${g.name} · ${g.members.length}`, g.box.x + 12, g.box.y + 8);
+  });
+  ctx.restore();
+}
+const groupAt = (pt) => groups.find((g) => g.box && pt.x >= g.box.x && pt.x <= g.box.x + g.box.w && pt.y >= g.box.y && pt.y <= g.box.y + g.box.h);
 
 /* ---------- group cables into Links (one per device pair) */
 function buildLinks(cables) {
@@ -220,12 +312,66 @@ function initNetwork() {
     if (SNAP) return; // dragging in an exported file is fine, there is nowhere to save it
     try { await api("POST", "/api/positions", body); } catch (e) { toast(e.message, true); }
   });
+  network.on("beforeDrawing", drawGroups);
+  network.on("doubleClick", (p) => {
+    if (p.nodes.length) return; // a line crossing the box still counts as the box: lines are thin and double-click does nothing else there
+    const g = groupAt(p.pointer.canvas);
+    if (!g) return;
+    const keys = g.members.filter((k) => nodes.get(k));
+    network.selectNodes(keys, false);
+    hidePanel();
+    toast(t("sel.group", { name: g.name, n: keys.length }));
+  });
   network.on("afterDrawing", (ctx) => {
     // node boxes are only sized once drawn, so routing waits for a frame
     if (needRoute) { needRoute = false; routeEdges(); }
     drawPortLabels(ctx);
   });
 }
+
+/* ---------- Shift + drag on an empty part of the map: box-select (Ctrl+Shift adds to the selection).
+   Dragging any selected device then moves them all (vis-network drags the whole selection). */
+const selBox = document.createElement("div");
+selBox.className = "sel-box hidden";
+$("#tab-map").appendChild(selBox);
+let boxStart = null;
+const mapXY = (e) => { const r = $("#map").getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+$("#map").addEventListener("pointerdown", (e) => {
+  if (!e.shiftKey || e.button !== 0 || !network) return;
+  const p = mapXY(e);
+  if (network.getNodeAt(p) !== undefined) return; // Shift on a device: normal behaviour
+  e.preventDefault();
+  e.stopPropagation(); // keep vis-network from panning the view
+  boxStart = { ...p, add: e.ctrlKey || e.metaKey };
+  Object.assign(selBox.style, { left: p.x + "px", top: p.y + "px", width: "0px", height: "0px" });
+  selBox.classList.remove("hidden");
+}, true);
+window.addEventListener("pointermove", (e) => {
+  if (!boxStart) return;
+  const p = mapXY(e);
+  Object.assign(selBox.style, {
+    left: Math.min(p.x, boxStart.x) + "px", top: Math.min(p.y, boxStart.y) + "px",
+    width: Math.abs(p.x - boxStart.x) + "px", height: Math.abs(p.y - boxStart.y) + "px",
+  });
+});
+window.addEventListener("pointerup", (e) => {
+  if (!boxStart) return;
+  const s = boxStart, p = mapXY(e);
+  boxStart = null;
+  selBox.classList.add("hidden");
+  if (Math.abs(p.x - s.x) < 4 && Math.abs(p.y - s.y) < 4) return;
+  const a = network.DOMtoCanvas({ x: Math.min(p.x, s.x), y: Math.min(p.y, s.y) });
+  const b = network.DOMtoCanvas({ x: Math.max(p.x, s.x), y: Math.max(p.y, s.y) });
+  const pos = network.getPositions();
+  const hit = Object.keys(pos).filter((k) => pos[k].x >= a.x && pos[k].x <= b.x && pos[k].y >= a.y && pos[k].y <= b.y);
+  const keys = s.add ? [...new Set([...network.getSelectedNodes(), ...hit])] : hit;
+  network.selectNodes(keys, false);
+  hidePanel();
+  if (keys.length) toast(t("sel.box", { n: keys.length }));
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && network && !e.target.closest("input, textarea, select")) { network.unselectAll(); hidePanel(); }
+});
 
 /* ---------- bend a Link around any device box its straight line would cross */
 const BENDS = [0.2, 0.35, 0.5].flatMap((roundness) => ["curvedCW", "curvedCCW"].map((type) => ({ enabled: true, type, roundness })));
@@ -253,7 +399,7 @@ function routeEdges() {
   const boxes = nodes.getIds().map((k) => [k, network.getBoundingBox(k)]);
   for (const id of edges.getIds()) {
     if (edges.get(id).smooth !== false) edges.update({ id, smooth: false });
-    if (!crossings(id, boxes)) continue;
+    if (gridLinks.has(id) || !crossings(id, boxes)) continue;
     let best = { smooth: false, n: Infinity };
     for (const smooth of BENDS) {
       edges.update({ id, smooth });

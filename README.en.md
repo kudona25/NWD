@@ -82,7 +82,13 @@ Lines that would cross over another device when drawn straight are automatically
 An orange line with a `×1/2` label means some cables in that Link are down.
 Cable type is inferred from the SFP type reported by the switch; if it is wrong, click the line and choose the correct one.
 
-Drag devices anywhere and NWD remembers their positions. To return to automatic layout, press **Auto layout** twice.
+### Groups and positioning
+
+- **Automatic groups:** every switch connected directly to the Seed Switch that has devices below it forms a group (its whole subtree), drawn in a coloured box with its name and device count. Groups are packed into several rows instead of one long line
+- End switches with nothing below them, and APs, are arranged in a grid under their parent switch
+- **Box select:** hold **Shift and drag** on an empty part of the map (Ctrl+Shift adds to the selection), then drag any selected device to move them all together
+- **Double-click inside a group box** selects the whole group · **Esc** clears the selection
+- Drag devices anywhere and NWD remembers their positions. To return to automatic layout, press **Auto layout** twice
 
 ## Data files
 
