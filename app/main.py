@@ -57,6 +57,7 @@ hub = Hub()
 status = {"running": False, "progress": [0, 0], "last_run": None, "next_run": None, "error": "",
           "paused": True, "started": time.time()}
 wake = asyncio.Event()
+resched = asyncio.Event()   # rescan interval changed: re-plan the next automatic crawl
 resume = asyncio.Event()
 crawl_lock = asyncio.Lock()
 
@@ -112,14 +113,24 @@ async def scheduler():
             await run_crawl("schedule")
         except Exception:
             log.exception("scheduler")
-        interval = db.get_settings()["interval_min"] * 60
-        status["next_run"] = time.time() + interval
-        await hub.send({"type": "status", "data": status})
+        last = time.time()
         wake.clear()
-        try:
-            await asyncio.wait_for(wake.wait(), timeout=interval)
-        except asyncio.TimeoutError:
-            pass
+        # wait for: the interval to pass, a manual Rescan (wake), or a changed interval (resched).
+        # A changed interval is applied at once — counted from the last crawl — instead of
+        # after the old wait ends (which could be a month away).
+        while True:
+            interval = db.get_settings()["interval_min"] * 60   # 0 = automatic rescan off
+            status["next_run"] = last + interval if interval else None
+            await hub.send({"type": "status", "data": status})
+            resched.clear()
+            waits = {asyncio.create_task(wake.wait()), asyncio.create_task(resched.wait())}
+            timeout = max(0.0, last + interval - time.time()) if interval else None
+            _, pending = await asyncio.wait(waits, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+            for t in pending:
+                t.cancel()
+            if resched.is_set() and not wake.is_set():
+                continue
+            break
 
 
 def record_gap():
@@ -129,7 +140,7 @@ def record_gap():
         return
     interval = db.get_settings()["interval_min"] * 60
     gap = time.time() - last[0]["finished"]
-    if gap > 2 * interval:
+    if interval and gap > 2 * interval:   # no schedule (interval 0) = no "missed rounds" to report
         fmt = lambda t: time.strftime("%Y-%m-%d %H:%M", time.localtime(t))
         db.add_event("gap", "ระบบไม่ได้ทำงาน",
                      f'{fmt(last[0]["finished"])} – {fmt(time.time())}: การเปลี่ยนแปลงรอบถัดไปอาจเกิดขึ้นช่วงไหนก็ได้ในระหว่างนี้')
@@ -216,11 +227,20 @@ def _check_ip(ip: str) -> str:
 
 
 @app.put("/api/settings")
-def put_settings(body: dict = Body(...)):
+async def put_settings(body: dict = Body(...)):
     if "seed_ip" in body:
         db.set_setting("seed_ip", _check_ip(body["seed_ip"]) if body["seed_ip"] else "")
-    for k, lo, hi in (("interval_min", 1, 1440), ("max_hops", 1, 50), ("workers", 1, 50),
-                     ("timeout_sec", 10, 600)):
+    if "interval_min" in body:
+        try:
+            v = int(body["interval_min"])
+        except (TypeError, ValueError):
+            raise HTTPException(400, "รอบ rescan ต้องเป็นตัวเลข")
+        if not 0 <= v <= db.INTERVAL_MAX_MIN:
+            raise HTTPException(400, "รอบ rescan ต้องอยู่ระหว่าง 1 นาที ถึง 12 เดือน (หรือปิด)")
+        if v != db.get_settings()["interval_min"]:
+            db.set_setting("interval_min", v)
+            resched.set()   # the scheduler re-plans the next crawl now
+    for k, lo, hi in (("max_hops", 1, 50), ("workers", 1, 50), ("timeout_sec", 10, 600)):
         if k in body:
             try:
                 v = int(body[k])

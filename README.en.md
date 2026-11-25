@@ -2,7 +2,7 @@
 
 [ภาษาไทย](README.md) | **English**
 
-NWD SSHes into a **Seed Switch** (core) and reads `show cdp neighbors detail`, `show lldp neighbors detail` and `show interfaces status`. It then walks the network one switch at a time (breadth-first) and draws a map that refreshes itself every 5 minutes.
+NWD SSHes into a **Seed Switch** (core) and reads `show cdp neighbors detail`, `show lldp neighbors detail` and `show interfaces status`. It then walks the network one switch at a time (breadth-first) and draws a map that refreshes itself on a schedule you choose (every 5 minutes by default).
 The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg) ![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-lightgrey.svg)
@@ -10,7 +10,7 @@ The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 ## Features
 
 - **Automatic topology discovery** — starts at the Seed Switch and follows CDP/LLDP neighbors breadth-first across the whole site
-- **Real-time updates** — re-crawls every 5 minutes (or on Rescan) and pushes changes to the web page over WebSocket
+- **Real-time updates** — automatic rescan every N minutes / hours / days / months (up to 12 months), or off so it only scans when you press Rescan; changes are pushed to the web page over WebSocket. A new interval applies immediately, counted from the last crawl
 - **Change detection** — devices or cables that appear, disappear or move port are recorded as Change Events, with a Suspect state to avoid false alarms
 - **Cable media types** — UTP / Fiber MM / Fiber SM / DAC inferred from the SFP type, overridable per cable
 - **Access point support** — APs (e.g. Cisco, Aruba) seen via CDP/LLDP appear as leaves on the map; NWD never logs in to them

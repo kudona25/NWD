@@ -68,6 +68,8 @@ DEFAULTS = {
     "telnet_fallback": "0",
 }
 
+INTERVAL_MAX_MIN = 12 * 30 * 24 * 60  # 12 "months" of 30 days
+
 # columns added after v1 — ALTER existing databases
 MIGRATIONS = [
     ("cred_override", "protocol", "TEXT DEFAULT 'ssh'"),
@@ -118,7 +120,9 @@ def tx(fn):
 
 def get_settings() -> dict:
     s = {r["key"]: r["value"] for r in q("SELECT key, value FROM settings")}
-    s["interval_min"] = max(1, int(s["interval_min"] or 5))
+    # minutes between automatic crawls; 0 = off (manual Rescan only)
+    v = s.get("interval_min")
+    s["interval_min"] = max(0, min(INTERVAL_MAX_MIN, int(v))) if v not in (None, "") else 5
     s["max_hops"] = max(1, int(s["max_hops"] or 10))
     s["workers"] = max(1, min(50, int(s["workers"] or 10)))
     s["timeout_sec"] = max(10, min(600, int(s.get("timeout_sec") or 60)))

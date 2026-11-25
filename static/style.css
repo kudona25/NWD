@@ -62,6 +62,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--accent); }
 .lg-title { color: var(--muted); font-size: 11px; text-transform: uppercase; margin-top: 4px; }
 .lg-title:first-child { margin-top: 0; }
 .legend .lg-hint { display: block; max-width: 230px; margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.interval { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.interval input { width: 110px; }
+.interval input:disabled { opacity: 0.4; }
 .sel-box { position: absolute; z-index: 4; pointer-events: none; border: 1px dashed var(--accent); background: rgba(68, 147, 248, 0.12); }
 .legend div { display: flex; align-items: center; gap: 8px; }
 .legend i.sw { width: 14px; height: 10px; border-radius: 2px; border-width: 2px; border-style: solid; display: inline-block; }

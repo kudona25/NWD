@@ -2,7 +2,7 @@
 
 **ภาษาไทย** | [English](README.en.md)
 
-ระบบจะ SSH เข้า **Seed Switch** (core) แล้วอ่าน `show cdp neighbors detail`, `show lldp neighbors detail` และ `show interfaces status` จากนั้นไล่ลงไปทีละ switch แบบ BFS แล้ววาดเป็นแผนที่ที่อัปเดตเองทุก 5 นาที
+ระบบจะ SSH เข้า **Seed Switch** (core) แล้วอ่าน `show cdp neighbors detail`, `show lldp neighbors detail` และ `show interfaces status` จากนั้นไล่ลงไปทีละ switch แบบ BFS แล้ววาดเป็นแผนที่ที่อัปเดตเองตามรอบที่ตั้งไว้ (ค่าเริ่มต้นทุก 5 นาที)
 คำศัพท์ที่ใช้ในระบบดูได้ที่ [CONTEXT.md](CONTEXT.md)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg) ![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-lightgrey.svg)
@@ -10,7 +10,7 @@
 ## ความสามารถหลัก
 
 - **ค้นหา topology อัตโนมัติ** — เริ่มจาก Seed Switch แล้วไล่ CDP/LLDP neighbor แบบ BFS ทั้ง site
-- **อัปเดต real-time** — crawl ใหม่ทุก 5 นาที (หรือกด Rescan) แล้ว push การเปลี่ยนแปลงไปหน้าเว็บผ่าน WebSocket
+- **อัปเดต real-time** — rescan อัตโนมัติตามรอบที่เลือกได้ เป็นนาที / ชั่วโมง / วัน / เดือน (สูงสุด 12 เดือน) หรือปิดไว้แล้วกด Rescan เองเท่านั้น แล้ว push การเปลี่ยนแปลงไปหน้าเว็บผ่าน WebSocket · เปลี่ยนรอบแล้วมีผลทันที โดยนับจาก crawl ครั้งล่าสุด
 - **ตรวจจับการเปลี่ยนแปลง** — อุปกรณ์/สายที่เพิ่ม หาย หรือย้าย port จะถูกบันทึกเป็น Change Event พร้อมสถานะ Suspect กันแจ้งเตือนพลาด
 - **แยกประเภทสาย** — UTP / Fiber MM / Fiber SM / DAC จากชนิด SFP และแก้เองได้รายเส้น
 - **รองรับ Access Point** — เห็น AP (เช่น Cisco, Aruba) จาก CDP/LLDP เป็นปลายทางบนแผนที่ โดยไม่ล็อกอินเข้า AP

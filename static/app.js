@@ -743,7 +743,8 @@ function renderStatus() {
     txt.textContent = t("status.paused");
     dot.className = "dot busy";
   } else {
-    txt.textContent = t("status.idle", { a: hhmm(s.last_run), b: hhmm(s.next_run) });
+    txt.textContent = s.next_run ? t("status.idle", { a: whenAt(s.last_run), b: whenAt(s.next_run) })
+      : t("status.idleOff", { a: whenAt(s.last_run) });
     dot.className = "dot";
   }
   $("#btnRescan").disabled = !!s.running;
@@ -809,6 +810,35 @@ $("#evFilter").oninput = () => renderEvents();
 async function loadEvents() { events = await api("GET", "/api/events"); renderEvents(); }
 
 /* ============================================================ settings */
+/* rescan interval: stored as minutes (0 = off); shown as number + unit (month = 30 days) */
+const INTERVAL_UNITS = [43200, 1440, 60, 1];
+const INTERVAL_MAX = 12 * 43200;
+function setInterval_(f, min) {
+  const unit = min ? INTERVAL_UNITS.find((u) => min % u === 0) : 0;
+  f.interval_unit.value = String(unit);
+  f.interval_n.value = min ? min / unit : "";
+  f.interval_n.disabled = !min;
+}
+function getInterval(f) {
+  const unit = +f.interval_unit.value;
+  if (!unit) return 0;
+  const n = Number(f.interval_n.value);
+  if (!Number.isInteger(n) || n < 1 || n * unit > INTERVAL_MAX) return null;
+  return n * unit;
+}
+$("#fSettings").interval_unit.onchange = (e) => {
+  const f = e.target.form, off = e.target.value === "0";
+  f.interval_n.disabled = off;
+  if (!off && !f.interval_n.value) f.interval_n.value = 1;
+};
+// "3 Dec 14:05" when the next run is not today, "14:05" when it is
+const whenAt = (ts) => {
+  if (!ts) return "-";
+  const d = new Date(ts * 1000);
+  return d.toDateString() === new Date().toDateString() ? hhmm(ts)
+    : d.toLocaleString(LOCALE(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+};
+
 let lastSettings = null;
 let lastOverrides = [];
 function renderSecretPlaceholders() {
@@ -821,7 +851,8 @@ async function loadSettings() {
   const s = await api("GET", "/api/settings");
   lastSettings = s;
   const f = $("#fSettings");
-  f.seed_ip.value = s.seed_ip; f.interval_min.value = s.interval_min; f.max_hops.value = s.max_hops;
+  setInterval_(f, s.interval_min);
+  f.seed_ip.value = s.seed_ip; f.max_hops.value = s.max_hops;
   f.workers.value = s.workers; f.timeout_sec.value = s.timeout_sec; f.allowed_subnets.value = s.allowed_subnets.join("\n"); f.username.value = s.username;
   f.password.value = ""; f.enable.value = ""; f.clear_enable.checked = false; f.telnet_fallback.checked = s.telnet_fallback;
   renderSecretPlaceholders();
@@ -831,8 +862,10 @@ $("#fSettings").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target;
   try {
+    const interval_min = getInterval(f);
+    if (interval_min === null) { f.interval_n.focus(); return toast(t("set.interval.bad"), true); }
     await api("PUT", "/api/settings", {
-      seed_ip: f.seed_ip.value.trim(), interval_min: +f.interval_min.value, max_hops: +f.max_hops.value,
+      seed_ip: f.seed_ip.value.trim(), interval_min, max_hops: +f.max_hops.value,
       workers: +f.workers.value, timeout_sec: +f.timeout_sec.value, allowed_subnets: f.allowed_subnets.value.split(/\s*\n\s*/).filter(Boolean),
       username: f.username.value, password: f.password.value, enable: f.enable.value, clear_enable: f.clear_enable.checked,
       telnet_fallback: f.telnet_fallback.checked,
