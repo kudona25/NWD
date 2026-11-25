@@ -18,12 +18,20 @@ async function api(method, url, body) {
   return data;
 }
 
-function toast(msg, bad = false) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.className = "toast" + (bad ? " bad" : "");
+// action = {label, fn}: adds a button (e.g. Undo) and keeps the toast up longer
+function toast(msg, bad = false, action = null) {
+  const el = $("#toast");
+  el.textContent = msg;
+  if (action) {
+    const b = document.createElement("button");
+    b.className = "btn";
+    b.textContent = action.label;
+    b.onclick = () => { el.classList.add("hidden"); action.fn(); };
+    el.append(" ", b);
+  }
+  el.className = "toast" + (bad ? " bad" : "");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.add("hidden"), 3000);
+  toast._t = setTimeout(() => el.classList.add("hidden"), action ? 10000 : 3000);
 }
 
 /* ============================================================ tabs */
@@ -590,9 +598,20 @@ $("#search").addEventListener("keydown", (e) => {
   d ? focusDevice(d.key) : toast(t("toast.notFound"), true);
 });
 $("#btnFit").onclick = () => network && network.fit({ animation: { duration: 400 } });
+// one click (a two-click confirm was easy to miss); Undo puts the dragged positions back
 $("#btnLayout").onclick = async () => {
-  if (!confirmInline("#btnLayout", t("confirm.layout"))) return;
-  try { await api("DELETE", "/api/positions"); firstFit = true; } catch (e) { toast(e.message, true); }
+  const saved = topo.devices.filter((d) => d.pos_x != null).map((d) => ({ key: d.key, x: d.pos_x, y: d.pos_y }));
+  try {
+    await api("DELETE", "/api/positions");
+    firstFit = true;
+    toast(t("toast.relayout", { n: saved.length }), false, !saved.length ? null : {
+      label: t("btn.undo"),
+      fn: async () => {
+        try { await api("POST", "/api/positions?push=1", saved); }
+        catch (e) { toast(e.message, true); }
+      },
+    });
+  } catch (e) { toast(e.message, true); }
 };
 $("#btnClearMap").onclick = async () => {
   if (!confirmInline("#btnClearMap", t("confirm.clear"))) return;
@@ -748,6 +767,7 @@ function renderStatus() {
     dot.className = "dot";
   }
   $("#btnRescan").disabled = !!s.running;
+  $("#verText").textContent = s.version || "-";
   const bar = $("#errorBar");
   bar.textContent = srv(s.error) || "";
   bar.classList.toggle("hidden", !s.error);

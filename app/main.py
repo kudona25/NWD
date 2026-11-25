@@ -31,6 +31,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("nwd")
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+
+
+def _version() -> str:
+    """What this server process is running: git commit + date, else the newest UI file's date.
+    Read once at startup, so an old value on screen means the server needs a restart."""
+    root = STATIC.parent
+    try:
+        r = subprocess.run(["git", "-C", str(root), "log", "-1", "--format=%h %cd", "--date=format:%Y-%m-%d %H:%M"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    newest = max((p.stat().st_mtime for p in STATIC.glob("*.*")), default=0)
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(newest))
+
+
+VERSION = _version()
 MEDIA_TYPES = {"UTP", "MM", "SM", "DAC", "Unknown"}
 
 
@@ -55,7 +73,7 @@ hub = Hub()
 # paused: no Crawl after startup until the user picks "scan this site" (or Rescan) on the page,
 # so reopening the app at a new site doesn't log in to the previous site's switches
 status = {"running": False, "progress": [0, 0], "last_run": None, "next_run": None, "error": "",
-          "paused": True, "started": time.time()}
+          "paused": True, "started": time.time(), "version": VERSION}
 wake = asyncio.Event()
 resched = asyncio.Event()   # rescan interval changed: re-plan the next automatic crawl
 resume = asyncio.Event()
@@ -314,9 +332,11 @@ async def _push_topology():
 
 
 @app.post("/api/positions")
-async def save_positions(body: list = Body(...)):
+async def save_positions(body: list = Body(...), push: bool = False):
     for p in body:
         db.x("UPDATE device SET pos_x=?, pos_y=? WHERE key=?", (float(p["x"]), float(p["y"]), p["key"]))
+    if push:   # e.g. Undo of Auto layout: every open page must redraw
+        await _push_topology()
     return {"ok": True}
 
 
