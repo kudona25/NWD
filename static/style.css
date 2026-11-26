@@ -73,6 +73,18 @@ input:disabled { opacity: 0.4; }
 .legend i.ln { width: 22px; height: 0; border-top: 3px solid var(--c); display: inline-block; }
 .legend i.ln.dash { border-top-style: dashed; }
 .legend i.ln.dot { border-top-style: dotted; }
+.summary { left: auto; right: 12px; min-width: 210px; max-width: 300px; }
+.summary .sm-head { cursor: pointer; user-select: none; font-weight: 600; gap: 6px; }
+.summary .sm-head small { color: var(--muted); font-weight: 400; }
+.summary .sm-caret { margin-left: auto; color: var(--muted); transition: transform .15s; }
+.summary.collapsed .sm-caret { transform: rotate(-90deg); }
+.summary.collapsed .sm-body { display: none; }
+.summary .sm-body { display: grid; gap: 2px; max-height: 45vh; overflow-y: auto; padding-right: 2px; }
+.summary .sm-body .lg-title { margin-top: 6px; }
+.summary .sm-row { justify-content: space-between; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: 0 -4px; }
+.summary .sm-row:hover { background: rgba(68, 147, 248, 0.15); }
+.summary .sm-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary .sm-row b { font-variant-numeric: tabular-nums; }
 
 .panel {
   position: absolute; top: 12px; right: 12px; bottom: 12px; width: 360px; overflow: auto;

@@ -19,7 +19,8 @@ The terms used throughout the system are defined in [CONTEXT.md](CONTEXT.md).
 - **Encrypted credentials** — switch passwords are stored in SQLite encrypted with Fernet; the key lives in a separate file
 - **SSH + Telnet fallback** — one default credential, or per-IP overrides
 - **Open a terminal to a switch straight from the map** (Windows Terminal / cmd)
-- **Export PDF / HTML** — PDF = map + device and cable tables · HTML = a single file that opens on any PC without running the program, with details, search and events
+- **Device summary by model** — a box in the bottom-right corner shows how many of each model were found (e.g. WS-C2960X-24TS-L × 14, Meraki MR44 × 45); click a model to select all of them on the map
+- **Export PDF / HTML** — PDF = map + model summary + device and cable tables · HTML = a single file that opens on any PC without running the program, with details, search and events
 - **Bilingual UI** — English / Thai, switchable at any time (also in exported HTML files)
 - **Works fully offline**, with a portable build that needs no Python installation
 - **Read-only** — never changes any configuration on the switches
@@ -105,6 +106,14 @@ If the cables in one Link are of different types, the line is white-dotted with 
 Lines that would cross over another device when drawn straight are automatically curved around it.
 An orange line with a `×1/2` label means some cables in that Link are down.
 Cable type is inferred from the SFP type reported by the switch; if it is wrong, click the line and choose the correct one.
+
+### Devices found
+
+The **Devices found** box in the bottom-right corner of the map counts every device on the map by model, split into Switch and Access Point, most common model first.
+- Model names are shortened and the same model is merged, e.g. `cisco WS-C2960X-24TS-L` → `WS-C2960X-24TS-L`, `Meraki MR44 Cloud Managed AP` → `Meraki MR44`, `ArubaOS (MODEL: 305)` → `Aruba AP-305`
+- Unreachable / out-of-scope devices are counted too (their model comes from the neighbouring switch's CDP/LLDP)
+- **Click a model** to select every device of that model on the map (then drag them together) · **click the box title** to collapse / expand; the choice is remembered
+- The same summary table is in Export PDF, and the box comes along in Export HTML files
 
 ### Groups and positioning
 

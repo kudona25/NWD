@@ -95,6 +95,48 @@ function nodeStyle(d) {
 }
 const shortPlatform = (p) => p.replace(/^cisco\s+/i, "").replace(/^Cisco\s+/i, "").slice(0, 28);
 
+/* ---------- device summary: how many of each model were found */
+// Same model, one name: "cisco WS-C2960X-24TS-L" → "WS-C2960X-24TS-L", "Meraki MR44 Cloud Managed AP" → "Meraki MR44",
+// "ArubaOS (MODEL: 305)" → "Aruba AP-305", "Cisco C1300-24T-4G (PID:C1300-24T-4G)-V" → "C1300-24T-4G"
+function modelName(d) {
+  const p = (d.platform || "").trim();
+  if (!p) return "";
+  let m = p.match(/ArubaOS.*MODEL:\s*([\w-]+)/i);
+  if (m) return "Aruba AP-" + m[1];
+  m = p.match(/^Meraki\s+(\S+)/i);
+  if (m) return "Meraki " + m[1].toUpperCase();
+  return p.replace(/^cisco\s+/i, "").replace(/\s*\(PID:.*$/i, "").trim();
+}
+
+function summaryRows() {
+  const by = new Map();
+  for (const d of topo.devices) {
+    const kind = d.kind === "ap" ? "ap" : "switch";
+    const model = modelName(d);
+    const id = kind + "|" + model;
+    if (!by.has(id)) by.set(id, { kind, model, keys: [] });
+    by.get(id).keys.push(d.key);
+  }
+  const rows = [...by.values()].sort((a, b) => b.keys.length - a.keys.length || a.model.localeCompare(b.model, undefined, { numeric: true }));
+  return { sw: rows.filter((r) => r.kind === "switch"), ap: rows.filter((r) => r.kind === "ap") };
+}
+
+let summaryIndex = []; // row number in the box → device keys, for click-to-select
+function renderSummary() {
+  const box = $("#summary");
+  box.classList.toggle("hidden", !topo.devices.length);
+  if (!topo.devices.length) return;
+  const { sw, ap } = summaryRows();
+  summaryIndex = [];
+  const total = (rs) => rs.reduce((n, r) => n + r.keys.length, 0);
+  const section = (title, rs) => rs.length ? `<div class="lg-title">${esc(title)} · ${total(rs)}</div>` + rs.map((r) => {
+    summaryIndex.push(r.keys);
+    return `<div class="sm-row" data-row="${summaryIndex.length - 1}" title="${esc(t("sm.click"))}"><span>${esc(r.model || t("sm.unknown"))}</span><b>${r.keys.length}</b></div>`;
+  }).join("") : "";
+  $("#summaryBody").innerHTML = section("Switch", sw) + section("Access Point", ap);
+  $("#summaryTotal").textContent = t("sm.total", { n: topo.devices.length });
+}
+
 /* ---------- grouped layout
    Seed on top. Every switch directly under the seed that has something below it starts a Group
    (its whole subtree), drawn in its own box; Groups are packed into rows instead of one long line.
@@ -292,6 +334,7 @@ function edgeStyle(link) {
 function render(newTopo) {
   topo = newTopo;
   $("#empty").classList.toggle("hidden", topo.devices.length > 0);
+  renderSummary();
   const auto = autoLayout(topo.devices);
   const nodeItems = topo.devices.map((d) => {
     const p = d.pos_x != null ? { x: d.pos_x, y: d.pos_y } : auto[d.key] || { x: 0, y: 0 };
@@ -391,6 +434,20 @@ window.addEventListener("pointerup", (e) => {
   hidePanel();
   if (keys.length) toast(t("sel.box", { n: keys.length }));
 });
+$("#summaryBody").addEventListener("click", (e) => {
+  const row = e.target.closest(".sm-row");
+  if (!row || !network) return;
+  const keys = (summaryIndex[+row.dataset.row] || []).filter((k) => nodes.get(k));
+  network.selectNodes(keys, false);
+  hidePanel();
+  toast(t("sel.model", { name: row.querySelector("span").textContent, n: keys.length }));
+});
+$("#summaryHead").onclick = () => {
+  const box = $("#summary");
+  box.classList.toggle("collapsed");
+  try { localStorage.setItem("nwd-summary-collapsed", box.classList.contains("collapsed") ? "1" : ""); } catch (e) { /* file:// may block storage */ }
+};
+try { if (localStorage.getItem("nwd-summary-collapsed")) $("#summary").classList.add("collapsed"); } catch (e) { /* file:// may block storage */ }
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && network && !e.target.closest("input, textarea, select")) { network.unselectAll(); hidePanel(); }
 });
@@ -686,12 +743,17 @@ async function exportPdf() {
   table { width: 100%; border-collapse: collapse; }
   th, td { border: 1px solid #ccc; padding: 3px 6px; text-align: left; vertical-align: top; }
   th { background: #eee; } tr { break-inside: avoid; } thead { display: table-header-group; }
+  table.sum { width: auto; min-width: 50%; } table.sum td:last-child { text-align: right; }
   .s-down { color: #c62828; font-weight: 600; } .s-suspect { color: #b26a00; } .s-unreachable, .s-boundary { color: #666; }
 </style></head><body>
 <h1>NWD · Logical Topology</h1>
 <div class="meta">Seed Switch: ${esc(topo.seed || "-")} · ${esc(t("pdf.meta", { sw, ap: devs.length - sw, c: cabs.length, now }))}</div>
 <img class="map" src="${img}">
-<h2 class="break">${esc(t("pdf.devices", { n: devs.length }))}</h2>
+<h2 class="break">${esc(t("sm.title"))}</h2>
+<table class="sum"><thead><tr><th>${t("pdf.type")}</th><th>${t("p.model")}</th><th>${t("sm.count")}</th></tr></thead><tbody>
+${(({ sw: s, ap: a }) => [...s, ...a])(summaryRows()).map((r) => `<tr><td>${r.kind === "ap" ? "AP" : "Switch"}</td><td>${esc(r.model || t("sm.unknown"))}</td><td>${r.keys.length}</td></tr>`).join("")}
+</tbody></table>
+<h2>${esc(t("pdf.devices", { n: devs.length }))}</h2>
 <table><thead><tr><th>${t("pdf.name")}</th><th>${t("pdf.type")}</th><th>IP</th><th>${t("p.model")}</th><th>Serial No.</th><th>${t("p.status")}</th><th>${t("p.via")}</th><th>Hop</th><th>${t("p.parent")}</th><th>${t("p.lastSeen")}</th></tr></thead><tbody>
 ${devs.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.hop === 0 ? " (Seed)" : ""}</td><td>${d.kind === "ap" ? "AP" : "Switch"}</td>
 <td>${esc(d.ip || "-")}</td><td>${esc(d.platform || "-")}</td><td>${(d.serial || "-").split(", ").map(esc).join("<br>")}</td><td class="s-${d.status}">${esc(statusName(d.status))}${d.note ? `<br><small>${esc(srv(d.note))}</small>` : ""}</td>
@@ -956,6 +1018,7 @@ document.addEventListener("nwd-lang", () => {
   renderEvents();
   renderSecretPlaceholders();
   renderOverrides(lastOverrides);
+  renderSummary();
   if (network) {
     // only labels change ("mixed"); edgeStyle resets bends, so route again
     edges.update(buildLinks(topo.cables).filter((l) => edges.get(l.id)).map((l) => ({ id: l.id, ...edgeStyle(l) })));
